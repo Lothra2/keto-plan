@@ -13,7 +13,7 @@
       --card: #0f172a;
       --text: #e2e8f0;
       --muted: rgba(226,232,240,.6);
-      --radius: 1rem;
+      --radius: 1.05rem;
     }
     [data-theme="light"] {
       --primary: #0f766e;
@@ -35,24 +35,24 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      padding: .9rem 1rem .5rem;
       gap: .8rem;
-      padding: .8rem 1rem .5rem;
-      background: rgba(15,23,42,.55);
+      background: rgba(15,23,42,.45);
       backdrop-filter: blur(10px);
       position: sticky;
       top: 0;
       z-index: 40;
     }
     [data-theme="light"] header {
-      background: rgba(241,245,249,.8);
+      background: rgba(241,245,249,.7);
     }
-    h1 { margin: 0; font-size: 1.05rem; }
+    h1 { margin: 0; font-size: 1.1rem; }
     .sub { margin: .2rem 0 0; font-size: .7rem; opacity: .8; }
     .toggle {
       display: flex;
       align-items: center;
       gap: .3rem;
-      font-size: .6rem;
+      font-size: .65rem;
       cursor: pointer;
       white-space: nowrap;
     }
@@ -60,7 +60,7 @@
     .ball {
       width: 40px;
       height: 20px;
-      background: rgba(226,232,240,.35);
+      background: rgba(226,232,240,.25);
       border-radius: 999px;
       position: relative;
     }
@@ -75,15 +75,20 @@
       left: 2px;
       transition: left .28s;
     }
-    input:checked + .ball { background: rgba(15,118,110,.9); }
-    input:checked + .ball::after { left: 22px; }
-
-    .hero { padding: .5rem 1rem .4rem; }
+    input:checked + .ball {
+      background: rgba(15,118,110,.85);
+    }
+    input:checked + .ball::after {
+      left: 22px;
+    }
+    .hero {
+      padding: .5rem 1rem .5rem;
+    }
     .tip {
-      background: linear-gradient(120deg, rgba(249,115,22,.15), rgba(15,118,110,.14));
-      border: 1px solid rgba(15,118,110,.25);
-      border-radius: .8rem;
-      padding: .58rem .65rem .45rem;
+      background: linear-gradient(120deg, rgba(249,115,22,.15), rgba(15,118,110,.12));
+      border: 1px solid rgba(15,118,110,.21);
+      border-radius: .9rem;
+      padding: .55rem .65rem .4rem;
       font-size: .7rem;
       display: flex;
       gap: .4rem;
@@ -92,63 +97,38 @@
     .tabs {
       display: flex;
       gap: .4rem;
-      padding: .35rem 1rem 0;
+      padding: .4rem 1rem 0;
       overflow-x: auto;
     }
     .tab {
       border: none;
       background: transparent;
-      padding: .38rem .7rem .45rem;
+      padding: .4rem .75rem .45rem;
       border-radius: 999px;
-      font-size: .68rem;
+      font-size: .7rem;
       color: var(--muted);
       flex-shrink: 0;
     }
     .tab.active {
-      background: rgba(15,118,110,.2);
+      background: rgba(15,118,110,.15);
       color: var(--text);
     }
-
     .container {
-      padding: .6rem 1rem 1.2rem;
-    }
-    .week-switch {
-      display: flex;
-      gap: .5rem;
-      margin-bottom: .5rem;
-    }
-    .week-btn {
-      flex: 1;
-      border: 1px solid rgba(148,163,184,.25);
-      background: rgba(15,118,110,.03);
-      border-radius: .7rem;
-      padding: .4rem .2rem .45rem;
-      font-size: .68rem;
-      text-align: center;
-      cursor: pointer;
-    }
-    .week-btn.active {
-      background: rgba(15,118,110,.4);
-      border-color: transparent;
-      color: #fff;
-    }
-    [data-theme="light"] .week-btn.active {
-      color: #0f172a;
+      padding: .7rem 1rem 1.2rem;
     }
     .progress-summary {
-      font-size: .72rem;
-      margin-bottom: .5rem;
       display: flex;
-      justify-content: space-between;
       gap: .5rem;
       align-items: center;
+      margin-bottom: .5rem;
+      font-size: .7rem;
     }
     .progress-line {
       height: 5px;
-      border-radius: 99px;
-      background: rgba(148,163,184,.24);
-      overflow: hidden;
+      background: rgba(148,163,184,.25);
+      border-radius: 999px;
       flex: 1;
+      overflow: hidden;
     }
     .progress-line span {
       display: block;
@@ -156,7 +136,26 @@
       background: linear-gradient(90deg, #0f766e, #f97316);
       width: 0%;
     }
-
+    .week-switch {
+      display: flex;
+      gap: .5rem;
+      margin-bottom: .6rem;
+    }
+    .week-btn {
+      flex: 1;
+      border: 1px solid rgba(148,163,184,.2);
+      background: rgba(15,118,110,.03);
+      border-radius: .8rem;
+      padding: .4rem .3rem .45rem;
+      font-size: .68rem;
+      text-align: center;
+      cursor: pointer;
+    }
+    .week-btn.active {
+      background: rgba(15,118,110,.3);
+      border-color: transparent;
+      color: #fff;
+    }
     .day-floating {
       display: flex;
       gap: .4rem;
@@ -165,7 +164,7 @@
     }
     .day-pill {
       background: rgba(15,118,110,.03);
-      border: 1px solid rgba(148,163,184,.12);
+      border: 1px solid rgba(148,163,184,.1);
       border-radius: 999px;
       padding: .25rem .8rem;
       font-size: .65rem;
@@ -175,15 +174,13 @@
     .day-pill.active {
       background: var(--primary);
       color: #fff;
-      border-color: transparent;
     }
-
     .day-card {
       background: radial-gradient(circle at top, rgba(15,118,110,.25), var(--card));
       border: 1px solid rgba(148,163,184,.08);
       border-radius: var(--radius);
-      padding: .85rem .75rem .7rem;
-      margin-bottom: .65rem;
+      padding: .9rem .8rem .75rem;
+      margin-bottom: .7rem;
       opacity: 0;
       transform: translateY(15px);
       transition: all .35s ease;
@@ -196,40 +193,47 @@
       display: flex;
       justify-content: space-between;
       gap: .5rem;
-      margin-bottom: .4rem;
+      margin-bottom: .35rem;
     }
-    .day-title h2 { margin: 0; font-size: .85rem; }
-    .kcal { font-size: .6rem; opacity: .6; }
+    .day-title h2 {
+      font-size: .85rem;
+      margin: 0;
+    }
+    .kcal {
+      font-size: .62rem;
+      opacity: .7;
+    }
     .macros {
       display: flex;
       gap: .4rem;
-      margin-bottom: .45rem;
+      margin-bottom: .4rem;
     }
     .macro {
       background: rgba(15,118,110,.08);
       border-radius: .5rem;
-      padding: .25rem .45rem;
-      font-size: .56rem;
+      padding: .28rem .55rem;
+      font-size: .6rem;
     }
     .food-grid {
       display: grid;
+      grid-template-columns: 1fr;
       gap: .45rem;
     }
     .meal {
-      background: rgba(15,23,42,.25);
-      border: 1px solid rgba(148,163,184,.02);
-      border-radius: .55rem;
-      padding: .4rem .45rem .3rem;
-      font-size: .66rem;
+      background: rgba(15,23,42,.2);
+      border: 1px solid rgba(15,118,110,.04);
+      border-radius: .6rem;
+      padding: .55rem .55rem .4rem;
+      font-size: .68rem;
     }
     [data-theme="light"] .meal {
-      background: rgba(255,255,255,.55);
+      background: rgba(255,255,255,.4);
     }
     .meal-title {
       display: flex;
       justify-content: space-between;
-      gap: .5rem;
-      margin-bottom: .2rem;
+      gap: .4rem;
+      margin-bottom: .15rem;
       font-weight: 600;
     }
     .meal-qty {
@@ -238,43 +242,45 @@
       text-align: right;
     }
     .day-actions {
-      margin-top: .4rem;
+      margin-top: .45rem;
       display: flex;
       gap: .4rem;
+      flex-wrap: wrap;
     }
     .done-btn {
       border: none;
-      background: rgba(34,197,94,.18);
+      background: rgba(34,197,94,.3);
       color: #ecfdf3;
+      padding: .32rem .5rem .4rem;
       font-size: .6rem;
-      padding: .32rem .5rem .35rem;
-      border-radius: .45rem;
+      border-radius: .5rem;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: .25rem;
     }
     .done-btn.done {
-      background: rgba(34,197,94,.45);
+      background: rgba(34,197,94,.5);
     }
-    [data-theme="light"] .done-btn {
-      color: #0f172a;
+    .swap-btn {
+      border: none;
+      background: rgba(15,118,110,.3);
+      color: #fff;
+      padding: .32rem .5rem .4rem;
+      font-size: .6rem;
+      border-radius: .5rem;
+      cursor: pointer;
     }
-
     .list-row {
-      background: rgba(15,23,42,.35);
+      background: rgba(15,23,42,.3);
       border: 1px solid rgba(148,163,184,.08);
       border-radius: .7rem;
-      padding: .6rem .6rem .4rem;
-      margin-bottom: .55rem;
+      padding: .55rem .6rem .35rem;
       font-size: .7rem;
+      margin-bottom: .55rem;
     }
-    .small { font-size: .63rem; opacity: .8; }
-
-    input, textarea {
+    .small { font-size: .62rem; opacity: .85; }
+    input, textarea, select {
       width: 100%;
       background: rgba(15,23,42,.2);
-      border: 1px solid rgba(148,163,184,.3);
+      border: 1px solid rgba(148,163,184,.25);
       border-radius: .5rem;
       padding: .5rem .45rem;
       color: inherit;
@@ -282,16 +288,16 @@
       margin-bottom: .4rem;
     }
     button.save-btn {
+      width: 100%;
       background: var(--primary);
       border: none;
       color: #fff;
       padding: .45rem .6rem .5rem;
       border-radius: .5rem;
-      width: 100%;
-      font-size: .65rem;
       font-weight: 600;
+      font-size: .65rem;
+      cursor: pointer;
     }
-
     .bottom-nav {
       position: fixed;
       bottom: 0;
@@ -322,19 +328,17 @@
     }
     .bottom-btn.active {
       color: var(--text);
-      background: rgba(15,118,110,.22);
+      background: rgba(15,118,110,.15);
     }
-
-    /* modal nombres */
     .modal-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,.4);
+      background: rgba(0,0,0,.35);
       display: none;
       align-items: center;
       justify-content: center;
-      z-index: 200;
       padding: 1rem;
+      z-index: 200;
     }
     .modal {
       background: var(--card);
@@ -350,23 +354,13 @@
     .modal p {
       margin: 0 0 .45rem;
       font-size: .65rem;
-      opacity: .7;
+      opacity: .75;
     }
-    .modal button {
-      background: var(--primary);
-      border: none;
-      color: #fff;
-      padding: .4rem .6rem .45rem;
-      border-radius: .45rem;
-      font-size: .65rem;
-      width: 100%;
-    }
-
     @media (min-width: 700px) {
       body { padding-bottom: 0; }
       .bottom-nav { display: none; }
       .container, header, .hero, .tabs { max-width: 760px; margin: 0 auto; }
-      .food-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .food-grid { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
 </head>
@@ -392,7 +386,7 @@
     <button class="tab" data-tab="progreso">Progreso</button>
   </div>
 
-  <!-- MENU -->
+  <!-- MENÚ -->
   <div class="container" id="menu">
     <div class="progress-summary">
       <span id="progressText">0 de 14 días</span>
@@ -412,7 +406,6 @@
   <!-- PROGRESO -->
   <div class="container" id="progreso" style="display:none"></div>
 
-  <!-- bottom nav -->
   <div class="bottom-nav">
     <button class="bottom-btn active" data-tab="menu">🍽 Menú</button>
     <button class="bottom-btn" data-tab="compras">🛒 Compras</button>
@@ -423,7 +416,7 @@
   <div class="modal-backdrop" id="nameModal">
     <div class="modal">
       <h2>¿Quién hace la dieta?</h2>
-      <p>Pon uno o dos nombres para personalizarla.</p>
+      <p>Pon uno o dos nombres para personalizar.</p>
       <input id="name1" placeholder="Nombre 1" />
       <input id="name2" placeholder="Nombre 2 (opcional)" />
       <button onclick="saveNames()">Guardar</button>
@@ -431,105 +424,135 @@
   </div>
 
   <script>
-    const LS_PREFIX = "keto14-rick-";
-    const LS_NAMES = LS_PREFIX + "names";
-    let weightChart = null;
+    const LS_PREFIX = "keto14-rick-"
+    const LS_NAMES = LS_PREFIX + "names"
+    const LS_THEME = LS_PREFIX + "theme"
+    const LS_START = LS_PREFIX + "start-date"
+    const LS_ACTIVE_PERSON = LS_PREFIX + "active-person"
+    let weightChart = null
 
-    /* datos del plan */
     const plan = [
       {dia:"Día 1",kcal:1650,macros:{carbs:"7%",prot:"25%",fat:"68%"},desayuno:{nombre:"Huevos con aguacate y feta",qty:"2 huevos, 1/2 aguacate, 30 g feta, 5 g mantequilla"},snackAM:{nombre:"Yogur griego con marañones",qty:"120 g yogur, 20 g marañones"},almuerzo:{nombre:"Salmón con brócoli",qty:"150 g salmón, 120 g brócoli, 10 g mantequilla"},snackPM:{nombre:"Feta con tomate cherry",qty:"30 g feta, 4 tomates"},cena:{nombre:"Bife de res con rocket y aguacate",qty:"160 g res, 40 g rocket, 1/2 aguacate"}},
       {dia:"Día 2",kcal:1600,macros:{carbs:"8%",prot:"24%",fat:"68%"},desayuno:{nombre:"Omelette feta y tomate",qty:"2-3 huevos, 30 g feta, 40 g tomate"},snackAM:{nombre:"Marañones y café",qty:"20 g marañones"},almuerzo:{nombre:"Pollo a la parrilla con rocket",qty:"150 g pollo, 50 g rocket, 1/2 aguacate"},snackPM:{nombre:"Yogur con coco",qty:"120 g yogur, 10 g coco"},cena:{nombre:"Camarones al ajillo con coliflor",qty:"140 g camarón, 120 g coliflor"}},
       {dia:"Día 3",kcal:1580,macros:{carbs:"6%",prot:"26%",fat:"68%"},desayuno:{nombre:"Yogur con nueces y chía",qty:"150 g yogur, 15 g nueces, 5 g chía"},snackAM:{nombre:"Feta y aguacate",qty:"25 g feta, 30 g aguacate"},almuerzo:{nombre:"Hamburguesa sin pan con rocket",qty:"150 g carne, 50 g rocket, 4 tomates"},snackPM:{nombre:"Marañones",qty:"20 g"},cena:{nombre:"Salmón con brócoli y mantequilla",qty:"150 g salmón, 120 g brócoli, 5 g mantequilla"}},
       {dia:"Día 4",kcal:1620,macros:{carbs:"7%",prot:"24%",fat:"69%"},desayuno:{nombre:"Huevos cocidos con aguacate",qty:"2 huevos, 1/2 aguacate"},snackAM:{nombre:"Yogur y marañones",qty:"120 g yogur, 20 g marañones"},almuerzo:{nombre:"Pollo en crema con champiñón y brócoli",qty:"150 g pollo, 60 g champiñón, 100 g brócoli, 20 ml crema"},snackPM:{nombre:"Feta con rocket",qty:"30 g feta, 20 g rocket"},cena:{nombre:"Carne roja con rocket y tomate seco",qty:"160 g carne, 40 g rocket, 15 g tomate seco"}},
       {dia:"Día 5",kcal:1590,macros:{carbs:"8%",prot:"25%",fat:"67%"},desayuno:{nombre:"Omelette con feta y champiñones",qty:"2-3 huevos, 30 g feta, 50 g champiñón"},snackAM:{nombre:"Café con crema + marañones",qty:"café + 10 ml crema + 15 g marañones"},almuerzo:{nombre:"Ensalada keto de pollo",qty:"140 g pollo, 1/2 aguacate, 40 g tomate, 40 g rocket"},snackPM:{nombre:"Yogur con coco",qty:"120 g yogur, 10 g coco"},cena:{nombre:"Camarones con puré de coliflor",qty:"140 g camarón, 120 g coliflor, 10 g mantequilla"}},
-      {dia:"Día 6",kcal:1600,macros:{carbs:"7%",prot:"25%",fat:"68%"},desayuno:{nombre:"Yogur con chía y nueces",qty:"150 g yogur, 5 g chía, 15 g nueces"},snackAM:{nombre:"Feta y aguacate",qty:"25 g feta, 30 g aguacate"},almuerzo:{nombre:"Bife con ensalada y feta",qty:"160 g res, 40 g verdes, 20 g feta"},snackPM:{nombre:"Marañones",qty:"20 g"},cena:{nombre:"Pollo al horno con brócoli gratinado",qty:"150 g pollo, 100 g brócoli, 20 g queso"}},
+      {dia:"Día 6",kcal:1600,macros:{carbs:"7%",prot:"25%",fat:"68%"},desayuno:{nombre:"Yogur con chía y nueces",qty:"150 g yogur, 5 g chía, 15 g nueces"},snackAM:{nombre:"Feta y aguacate",qty:"25 g feta, 30 g aguacate"},almuerzo:{nombre:"Bife con ensalada y feta",qty:"160 g res, 40 g hojas verdes, 20 g feta"},snackPM:{nombre:"Marañones",qty:"20 g"},cena:{nombre:"Pollo al horno con brócoli gratinado",qty:"150 g pollo, 100 g brócoli, 20 g queso"}},
       {dia:"Día 7",kcal:1580,macros:{carbs:"7%",prot:"24%",fat:"69%"},desayuno:{nombre:"Huevos revueltos con mantequilla y aguacate",qty:"2 huevos, 1/2 aguacate, 5 g mantequilla"},snackAM:{nombre:"Yogur + chía",qty:"120 g yogur, 5 g chía"},almuerzo:{nombre:"Ensalada de salmón con rocket y feta",qty:"140 g salmón, 40 g rocket, 20 g feta"},snackPM:{nombre:"Feta con tomate",qty:"30 g feta, 4 tomates"},cena:{nombre:"Filete de res con brócoli",qty:"160 g res, 100 g brócoli, 5 g mantequilla"}},
       {dia:"Día 8",kcal:1600,macros:{carbs:"7%",prot:"25%",fat:"68%"},desayuno:{nombre:"Omelette 3 huevos con feta y rocket",qty:"3 huevos, 30 g feta, 30 g rocket"},snackAM:{nombre:"Yogur con marañones",qty:"120 g yogur, 20 g marañones"},almuerzo:{nombre:"Pollo salteado con brócoli",qty:"150 g pollo, 100 g brócoli, 5 ml aceite"},snackPM:{nombre:"Feta y aguacate",qty:"25 g feta, 30 g aguacate"},cena:{nombre:"Salmón con mantequilla de ajo",qty:"150 g salmón, 5 g mantequilla"}},
       {dia:"Día 9",kcal:1590,macros:{carbs:"7%",prot:"25%",fat:"68%"},desayuno:{nombre:"Yogur con nueces y coco",qty:"150 g yogur, 10 g coco, 15 g nueces"},snackAM:{nombre:"Feta y tomate",qty:"25 g feta, 4 tomates"},almuerzo:{nombre:"Bife con rocket y aguacate",qty:"160 g res, 40 g rocket, 1/2 aguacate"},snackPM:{nombre:"Marañones o almendras",qty:"20 g"},cena:{nombre:"Camarones con crema y brócoli",qty:"140 g camarón, 100 g brócoli, 20 ml crema"}},
       {dia:"Día 10",kcal:1600,macros:{carbs:"8%",prot:"24%",fat:"68%"},desayuno:{nombre:"Huevos fritos con aguacate",qty:"2 huevos, 1/2 aguacate"},snackAM:{nombre:"Yogur con chía",qty:"120 g yogur, 5 g chía"},almuerzo:{nombre:"Pollo al curry sin arroz con coliflor",qty:"150 g pollo, 100 g coliflor"},snackPM:{nombre:"Feta con rocket",qty:"25 g feta, 20 g rocket"},cena:{nombre:"Salmón con tomate y feta",qty:"150 g salmón, 40 g tomate, 20 g feta"}},
-      {dia:"Día 11",kcal:1590,macros:{carbs:"7%",prot:"25%",fat:"68%"},desayuno:{nombre:"Omelette champiñón y feta",qty:"2-3 huevos, 50 g champiñón, 20 g feta"},snackAM:{nombre:"Marañones",qty:"20 g"},almuerzo:{nombre:"Ensalada de pollo y aguacate",qty:"140 g pollo, 1/2 aguacate, 40 g rocket"},snackPM:{nombre:"Yogur con coco",qty:"120 g yogur, 10 g coco"},cena:{nombre:"Carne roja con puré de coliflor",qty:"160 g carne, 120 g coliflor"}},
+      {dia:"Día 11",kcal:1590,macros:{carbs:"7%",prot:"25%",fat:"68%"},desayuno:{nombre:"Omelette con champiñones y feta",qty:"2-3 huevos, 50 g champiñón, 20 g feta"},snackAM:{nombre:"Marañones",qty:"20 g"},almuerzo:{nombre:"Ensalada de pollo y aguacate",qty:"140 g pollo, 1/2 aguacate, 40 g rocket"},snackPM:{nombre:"Yogur con coco",qty:"120 g yogur, 10 g coco"},cena:{nombre:"Carne roja con puré de coliflor",qty:"160 g carne, 120 g coliflor"}},
       {dia:"Día 12",kcal:1580,macros:{carbs:"7%",prot:"24%",fat:"69%"},desayuno:{nombre:"Yogur con nueces",qty:"150 g yogur, 15 g nueces"},snackAM:{nombre:"Feta y aguacate",qty:"25 g feta, 30 g aguacate"},almuerzo:{nombre:"Camarones al ajillo con ensalada",qty:"140 g camarón, 50 g hojas verdes, 5 ml aceite"},snackPM:{nombre:"Café con crema + marañones",qty:"10 ml crema, 15 g marañones"},cena:{nombre:"Pollo al horno con brócoli y feta",qty:"150 g pollo, 100 g brócoli, 20 g feta"}},
       {dia:"Día 13",kcal:1600,macros:{carbs:"7%",prot:"24%",fat:"69%"},desayuno:{nombre:"Huevos cocidos con aguacate",qty:"2 huevos, 1/2 aguacate"},snackAM:{nombre:"Yogur con coco",qty:"120 g yogur, 10 g coco"},almuerzo:{nombre:"Bife con tomate y rocket",qty:"160 g res, 40 g rocket, 40 g tomate"},snackPM:{nombre:"Feta con nueces",qty:"25 g feta, 10 g nueces"},cena:{nombre:"Salmón con mantequilla y brócoli",qty:"150 g salmón, 100 g brócoli, 5 g mantequilla"}},
       {dia:"Día 14",kcal:1600,macros:{carbs:"7%",prot:"24%",fat:"69%"},desayuno:{nombre:"Omelette feta y rocket",qty:"2-3 huevos, 30 g feta, 30 g rocket"},snackAM:{nombre:"Yogur con chía",qty:"120 g yogur, 5 g chía"},almuerzo:{nombre:"Pollo con aguacate y tomate",qty:"140 g pollo, 1/2 aguacate, 40 g tomate"},snackPM:{nombre:"Marañones o feta",qty:"20 g marañones o 25 g feta"},cena:{nombre:"Filete de res con brócoli y mantequilla",qty:"160 g res, 100 g brócoli, 5 g mantequilla"}}
-    ];
+    ]
+
+    // cenas alternativas
+    const cenaSwaps = [
+      {nombre:"Pollo 150 g con brócoli 120 g y mantequilla 5 g",qty:"150 g pollo, 120 g brócoli, 5 g mantequilla"},
+      {nombre:"Hamburguesa sin pan con queso y ensalada",qty:"150 g carne, 20 g queso, ensalada verde"},
+      {nombre:"Salmón 140 g con ensalada verde",qty:"140 g salmón, 50 g hojas verdes"}
+    ]
 
     const tips = [
-      "🥤 Tomen agua con un poco de sal, ayuda a no sentirse bajos.",
-      "🥑 Si hay hambre suban grasa, no carbos.",
-      "🍳 Dos huevos extra en desayuno están bien.",
+      "🥤 Tomen agua con un poco de sal.",
+      "🥑 Si hay hambre suban grasa.",
+      "🍳 Dos huevos extra están bien.",
       "📸 Foto día 1 y día 14.",
-      "🧴 Pueden cambiar mantequilla por aceite de oliva."
-    ];
+      "🧴 Pueden cambiar mantequilla por aceite."
+    ]
 
     function setRandomTip(names) {
-      const tipBox = document.getElementById("tipBox");
-      const base = tips[Math.floor(Math.random() * tips.length)];
-      if (names && names.length > 0) {
-        tipBox.textContent = base + " " + names.join(" y ") + ".";
+      const tipBox = document.getElementById("tipBox")
+      const base = tips[Math.floor(Math.random() * tips.length)]
+      if (names && names.length) {
+        tipBox.textContent = base + " " + names.join(" y ") + "."
       } else {
-        tipBox.textContent = base;
+        tipBox.textContent = base
       }
     }
 
     function saveNames() {
-      const n1 = document.getElementById("name1").value.trim();
-      const n2 = document.getElementById("name2").value.trim();
-      const names = [];
-      if (n1) names.push(n1);
-      if (n2) names.push(n2);
-      localStorage.setItem(LS_NAMES, JSON.stringify(names));
-      document.getElementById("nameModal").style.display = "none";
-      setHeaderNames(names);
-      setRandomTip(names);
+      const n1 = document.getElementById("name1").value.trim()
+      const n2 = document.getElementById("name2").value.trim()
+      const names = []
+      if (n1) names.push(n1)
+      if (n2) names.push(n2)
+      localStorage.setItem(LS_NAMES, JSON.stringify(names))
+      // guardar el primero como activo
+      if (names.length) {
+        localStorage.setItem(LS_ACTIVE_PERSON, names[0])
+      }
+      document.getElementById("nameModal").style.display = "none"
+      setHeaderNames(names)
+      setRandomTip(names)
     }
 
     function setHeaderNames(names) {
-      const title = document.getElementById("mainTitle");
-      const sub = document.getElementById("subTitle");
-      if (names && names.length > 0) {
-        title.textContent = "Plan Keto 14 días 🥑";
-        sub.textContent = "Para " + names.join(" y ");
+      const sub = document.getElementById("subTitle")
+      if (names && names.length) {
+        sub.textContent = "Para " + names.join(" y ")
       } else {
-        sub.textContent = "Personalizado";
+        sub.textContent = "Personalizado"
       }
     }
 
+    function askStartDateIfNeeded() {
+      const saved = localStorage.getItem(LS_START)
+      if (!saved) {
+        const today = new Date().toISOString().slice(0,10)
+        localStorage.setItem(LS_START, today)
+      }
+    }
+
+    function getCurrentDayIndex() {
+      const saved = localStorage.getItem(LS_START)
+      if (!saved) return 0
+      const start = new Date(saved)
+      const today = new Date()
+      const diffMs = today - start
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+      if (diffDays < 0) return 0
+      if (diffDays > 13) return 13
+      return diffDays
+    }
+
     function renderDayPills(week) {
-      const wrap = document.getElementById("dayFloating");
-      wrap.innerHTML = "";
-      const start = week === 1 ? 0 : 7;
-      const end = week === 1 ? 7 : 14;
+      const wrap = document.getElementById("dayFloating")
+      wrap.innerHTML = ""
+      const start = week === 1 ? 0 : 7
+      const end = week === 1 ? 7 : 14
       for (let i = start; i < end; i++) {
-        const pill = document.createElement("div");
-        pill.className = "day-pill" + (i === start ? " active" : "");
-        pill.textContent = plan[i].dia;
-        pill.onclick = () => renderMenuDay(i, week);
-        wrap.appendChild(pill);
+        const pill = document.createElement("div")
+        pill.className = "day-pill"
+        pill.textContent = plan[i].dia
+        pill.onclick = () => renderMenuDay(i, week)
+        wrap.appendChild(pill)
       }
     }
 
     function getCompletedCount() {
-      let count = 0;
+      let count = 0
       for (let i = 0; i < plan.length; i++) {
-        if (localStorage.getItem(LS_PREFIX + "done-" + i) === "1") count++;
+        if (localStorage.getItem(LS_PREFIX + "done-" + i) === "1") count++
       }
-      return count;
+      return count
     }
 
     function updateProgressBar() {
-      const count = getCompletedCount();
-      document.getElementById("progressText").textContent = count + " de 14 días";
-      const bar = document.getElementById("progressBar");
-      bar.style.width = (count / 14 * 100) + "%";
+      const count = getCompletedCount()
+      document.getElementById("progressText").textContent = count + " de 14 días"
+      document.getElementById("progressBar").style.width = (count / 14 * 100) + "%"
     }
 
     function renderMenuDay(idx, week) {
-      const menuDays = document.getElementById("menuDays");
-      menuDays.innerHTML = "";
-      const day = plan[idx];
-      const done = localStorage.getItem(LS_PREFIX + "done-" + idx) === "1";
-      const card = document.createElement("div");
-      card.className = "day-card";
+      const menuDays = document.getElementById("menuDays")
+      menuDays.innerHTML = ""
+      const day = plan[idx]
+      const done = localStorage.getItem(LS_PREFIX + "done-" + idx) === "1"
+      const card = document.createElement("div")
+      card.className = "day-card"
       card.innerHTML = `
         <div class="day-title">
           <h2>${day.dia}</h2>
@@ -557,176 +580,235 @@
             <div class="meal-title"><span>🥜 Snack PM</span><span class="meal-qty">${day.snackPM.qty}</span></div>
             <div>${day.snackPM.nombre}</div>
           </div>
-          <div class="meal">
+          <div class="meal" id="cena-block">
             <div class="meal-title"><span>🍖 Cena</span><span class="meal-qty">${day.cena.qty}</span></div>
-            <div>${day.cena.nombre}</div>
+            <div id="cena-text">${day.cena.nombre}</div>
           </div>
         </div>
         <div class="day-actions">
           <button class="done-btn ${done ? "done" : ""}" onclick="toggleDone(${idx}, ${week})">${done ? "✔ Día completado" : "Marcar día ✔"}</button>
+          <button class="swap-btn" onclick="swapCena(${idx}, ${week})">Cambiar cena 🔁</button>
         </div>
-      `;
-      menuDays.appendChild(card);
-      animateCards();
+      `
+      menuDays.appendChild(card)
+      animateCards()
 
       document.querySelectorAll(".day-pill").forEach((p, i) => {
-        const base = week === 1 ? 0 : 7;
-        p.classList.toggle("active", (i + base) === idx);
-      });
+        const base = week === 1 ? 0 : 7
+        p.classList.toggle("active", (i + base) === idx)
+      })
     }
 
     function toggleDone(idx, week) {
-      const key = LS_PREFIX + "done-" + idx;
-      const current = localStorage.getItem(key) === "1";
-      localStorage.setItem(key, current ? "0" : "1");
-      renderMenuDay(idx, week);
-      updateProgressBar();
+      const key = LS_PREFIX + "done-" + idx
+      const cur = localStorage.getItem(key) === "1"
+      localStorage.setItem(key, cur ? "0" : "1")
+      renderMenuDay(idx, week)
+      updateProgressBar()
     }
-    window.toggleDone = toggleDone;
+    window.toggleDone = toggleDone
+
+    function swapCena(idx, week) {
+      const option = cenaSwaps[Math.floor(Math.random() * cenaSwaps.length)]
+      // no tocamos el plan original, solo pintamos de nuevo
+      const menuDays = document.getElementById("menuDays")
+      renderMenuDay(idx, week)
+      const cenaText = document.querySelector("#menuDays #cena-text")
+      const cenaBlock = document.querySelector("#menuDays #cena-block .meal-qty")
+      if (cenaText && cenaBlock) {
+        cenaText.textContent = option.nombre
+        cenaBlock.textContent = option.qty
+      }
+    }
+    window.swapCena = swapCena
 
     function renderCompras() {
-      const container = document.getElementById("compras");
-      container.innerHTML = "";
-      const data = [
+      const container = document.getElementById("compras")
+      container.innerHTML = ""
+
+      // dashboard semanal
+      const done = getCompletedCount()
+      const doneWeek1 = Array.from({length:7}).filter((_,i)=>localStorage.getItem(LS_PREFIX+"done-"+i)==="1").length
+      const doneWeek2 = Array.from({length:7}).filter((_,i)=>localStorage.getItem(LS_PREFIX+"done-"+(i+7))==="1").length
+      const dash = document.createElement("div")
+      dash.className = "list-row"
+      dash.innerHTML = `
+        <strong>Resumen rápido</strong>
+        <div class="small">Total completado: ${done} de 14</div>
+        <div class="small">Semana 1: ${doneWeek1} de 7</div>
+        <div class="small">Semana 2: ${doneWeek2} de 7</div>
+      `
+      container.appendChild(dash)
+
+      const list = [
         {cat:"Proteínas",items:"Huevos, pollo, salmón, camarones, carne de res, yogur griego"},
         {cat:"Verduras",items:"Brócoli, coliflor, tomate cherry, rocket/rúcula, aguacate, champiñón"},
-        {cat:"Grasas",items:"Mantequilla, aceite de oliva, crema de leche, queso feta"},
+        {cat:"Grasas buenas",items:"Mantequilla, aceite de oliva, crema de leche, queso feta"},
         {cat:"Snacks",items:"Marañones, nueces, chía, coco rallado"},
         {cat:"Otros",items:"Café sin azúcar, sal rosada, limón"}
-      ];
-      data.forEach(d => {
-        const row = document.createElement("div");
-        row.className = "list-row";
-        row.innerHTML = `<strong>${d.cat}</strong><div class="small">${d.items}</div>`;
-        container.appendChild(row);
-      });
-      animateCards();
+      ]
+      list.forEach(it => {
+        const row = document.createElement("div")
+        row.className = "list-row"
+        row.innerHTML = `<strong>${it.cat}</strong><div class="small">${it.items}</div>`
+        container.appendChild(row)
+      })
+      animateCards()
     }
 
     function renderProgreso() {
-      const container = document.getElementById("progreso");
-      container.innerHTML = "";
-      const canvas = document.createElement("canvas");
-      canvas.id = "weightChart";
-      canvas.style.maxWidth = "100%";
-      container.appendChild(canvas);
+      const container = document.getElementById("progreso")
+      container.innerHTML = ""
 
-      const note = document.createElement("div");
-      note.className = "list-row";
-      note.textContent = "Aquí se guarda en tu navegador. Si entras mañana desde el mismo teléfono sigue ahí.";
-      container.appendChild(note);
+      // selector de persona
+      const names = JSON.parse(localStorage.getItem(LS_NAMES) || "[]")
+      const activePerson = localStorage.getItem(LS_ACTIVE_PERSON) || (names[0] || "default")
+      if (names.length) {
+        const sel = document.createElement("select")
+        sel.id = "personSelect"
+        names.forEach(n => {
+          const opt = document.createElement("option")
+          opt.value = n
+          opt.textContent = n
+          if (n === activePerson) opt.selected = true
+          sel.appendChild(opt)
+        })
+        sel.addEventListener("change", e => {
+          localStorage.setItem(LS_ACTIVE_PERSON, e.target.value)
+          renderProgreso()
+        })
+        const rowSel = document.createElement("div")
+        rowSel.className = "list-row"
+        rowSel.innerHTML = "<strong>Progreso por persona</strong>"
+        rowSel.appendChild(sel)
+        container.appendChild(rowSel)
+      }
+
+      const canvas = document.createElement("canvas")
+      canvas.id = "weightChart"
+      canvas.style.maxWidth = "100%"
+      container.appendChild(canvas)
+
+      const note = document.createElement("div")
+      note.className = "list-row"
+      note.textContent = "Se guarda en este navegador. Cada nombre tiene su propio registro."
+      container.appendChild(note)
 
       plan.forEach((d, idx) => {
-        const saved = JSON.parse(localStorage.getItem(LS_PREFIX + "prog-" + idx) || "{}");
-        const card = document.createElement("div");
-        card.className = "day-card";
+        const key = LS_PREFIX + "prog-" + activePerson + "-" + idx
+        const saved = JSON.parse(localStorage.getItem(key) || "{}")
+        const card = document.createElement("div")
+        card.className = "day-card"
         card.innerHTML = `
-          <div class="day-title"><h2>${d.dia}</h2><div class="kcal">${d.kcal} kcal</div></div>
+          <div class="day-title"><h2>${d.dia}</h2><span class="kcal">${d.kcal} kcal</span></div>
           <input type="number" placeholder="Peso (kg)" id="peso-${idx}" value="${saved.peso || ""}">
           <input type="number" placeholder="Cintura (cm)" id="cintura-${idx}" value="${saved.cintura || ""}">
           <input type="number" placeholder="Energía (1-10)" id="energia-${idx}" value="${saved.energia || ""}">
           <textarea placeholder="Notas" id="nota-${idx}">${saved.notas || ""}</textarea>
           <button class="save-btn" onclick="saveProgreso(${idx})">Guardar</button>
-        `;
-        container.appendChild(card);
-      });
-      animateCards();
-      drawChart();
+        `
+        container.appendChild(card)
+      })
+      animateCards()
+      drawChart()
     }
 
     function saveProgreso(idx) {
+      const names = JSON.parse(localStorage.getItem(LS_NAMES) || "[]")
+      const activePerson = localStorage.getItem(LS_ACTIVE_PERSON) || (names[0] || "default")
       const data = {
         peso: document.getElementById("peso-" + idx).value,
         cintura: document.getElementById("cintura-" + idx).value,
         energia: document.getElementById("energia-" + idx).value,
         notas: document.getElementById("nota-" + idx).value
-      };
-      localStorage.setItem(LS_PREFIX + "prog-" + idx, JSON.stringify(data));
-      alert("✅ Guardado");
-      drawChart();
+      }
+      const key = LS_PREFIX + "prog-" + activePerson + "-" + idx
+      localStorage.setItem(key, JSON.stringify(data))
+      alert("✅ Guardado para " + activePerson)
+      drawChart()
     }
-    window.saveProgreso = saveProgreso;
+    window.saveProgreso = saveProgreso
 
     function switchTab(target) {
-      const sections = ["menu","compras","progreso"];
+      const sections = ["menu","compras","progreso"]
       sections.forEach(id => {
-        const el = document.getElementById(id);
-        el.style.display = id === target ? "block" : "none";
+        const el = document.getElementById(id)
+        el.style.display = id === target ? "block" : "none"
         if (id === "progreso" && target !== "progreso") {
           if (weightChart) {
-            weightChart.destroy();
-            weightChart = null;
+            weightChart.destroy()
+            weightChart = null
           }
-          el.innerHTML = "";
+          el.innerHTML = ""
         }
-      });
-
-      document.querySelectorAll(".tab").forEach(t => {
-        t.classList.toggle("active", t.dataset.tab === target);
-      });
-      document.querySelectorAll(".bottom-btn").forEach(t => {
-        t.classList.toggle("active", t.dataset.tab === target);
-      });
+      })
+      document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === target))
+      document.querySelectorAll(".bottom-btn").forEach(t => t.classList.toggle("active", t.dataset.tab === target))
 
       if (target === "menu") {
-        renderDayPills(1);
-        renderMenuDay(0,1);
-        updateProgressBar();
+        // mostrar día actual según fecha
+        const idx = getCurrentDayIndex()
+        const week = idx < 7 ? 1 : 2
+        renderDayPills(week)
+        renderMenuDay(idx, week)
+        updateProgressBar()
       }
-      if (target === "compras") renderCompras();
-      if (target === "progreso") renderProgreso();
+      if (target === "compras") renderCompras()
+      if (target === "progreso") renderProgreso()
     }
 
     document.querySelectorAll(".tab").forEach(tab => {
-      tab.addEventListener("click", () => switchTab(tab.dataset.tab));
-    });
+      tab.addEventListener("click", () => switchTab(tab.dataset.tab))
+    })
     document.querySelectorAll(".bottom-btn").forEach(btn => {
-      btn.addEventListener("click", () => switchTab(btn.dataset.tab));
-    });
+      btn.addEventListener("click", () => switchTab(btn.dataset.tab))
+    })
 
     document.addEventListener("click", e => {
       if (e.target.classList.contains("week-btn")) {
-        document.querySelectorAll(".week-btn").forEach(b => b.classList.remove("active"));
-        e.target.classList.add("active");
-        const week = Number(e.target.dataset.week);
-        renderDayPills(week);
-        const idx = week === 1 ? 0 : 7;
-        renderMenuDay(idx, week);
+        document.querySelectorAll(".week-btn").forEach(b => b.classList.remove("active"))
+        e.target.classList.add("active")
+        const week = Number(e.target.dataset.week)
+        renderDayPills(week)
+        const idx = week === 1 ? 0 : 7
+        renderMenuDay(idx, week)
       }
-    });
+    })
 
-    const themeToggle = document.getElementById("themeToggle");
-    const savedTheme = localStorage.getItem(LS_PREFIX + "theme") || "dark";
-    document.body.setAttribute("data-theme", savedTheme);
-    themeToggle.checked = savedTheme === "dark";
+    const themeToggle = document.getElementById("themeToggle")
+    const savedTheme = localStorage.getItem(LS_THEME) || "dark"
+    document.body.setAttribute("data-theme", savedTheme)
+    themeToggle.checked = savedTheme === "dark"
     themeToggle.addEventListener("change", () => {
-      const mode = themeToggle.checked ? "dark" : "light";
-      document.body.setAttribute("data-theme", mode);
-      localStorage.setItem(LS_PREFIX + "theme", mode);
-    });
+      const mode = themeToggle.checked ? "dark" : "light"
+      document.body.setAttribute("data-theme", mode)
+      localStorage.setItem(LS_THEME, mode)
+    })
 
     function animateCards() {
-      const items = document.querySelectorAll(".day-card, .list-row");
+      const items = document.querySelectorAll(".day-card, .list-row")
       if ("IntersectionObserver" in window) {
         const observer = new IntersectionObserver(entries => {
           entries.forEach(e => {
-            if (e.isIntersecting) e.target.classList.add("show");
-          });
-        }, {threshold: .15});
-        items.forEach(i => observer.observe(i));
+            if (e.isIntersecting) e.target.classList.add("show")
+          })
+        }, {threshold: .15})
+        items.forEach(i => observer.observe(i))
       } else {
-        items.forEach(i => i.classList.add("show"));
+        items.forEach(i => i.classList.add("show"))
       }
     }
 
     function drawChart() {
-      const ctx = document.getElementById("weightChart");
-      if (!ctx || typeof Chart === "undefined") return;
+      const ctx = document.getElementById("weightChart")
+      if (!ctx || typeof Chart === "undefined") return
+      const names = JSON.parse(localStorage.getItem(LS_NAMES) || "[]")
+      const activePerson = localStorage.getItem(LS_ACTIVE_PERSON) || (names[0] || "default")
       const weights = plan.map((_, idx) => {
-        const saved = JSON.parse(localStorage.getItem(LS_PREFIX + "prog-" + idx) || "{}");
-        return saved.peso ? parseFloat(saved.peso) : null;
-      });
-      if (weightChart) weightChart.destroy();
+        const saved = JSON.parse(localStorage.getItem(LS_PREFIX + "prog-" + activePerson + "-" + idx) || "{}")
+        return saved.peso ? parseFloat(saved.peso) : null
+      })
+      if (weightChart) weightChart.destroy()
       weightChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -744,23 +826,27 @@
           plugins: { legend: { display: false } },
           scales: { y: { beginAtZero: false } }
         }
-      });
-      ctx.parentElement.style.height = "180px";
+      })
+      ctx.parentElement.style.height = "180px"
     }
 
-    /* init */
-    (function init() {
-      const names = JSON.parse(localStorage.getItem(LS_NAMES) || "[]");
-      if (!names || names.length === 0) {
-        document.getElementById("nameModal").style.display = "flex";
+    ;(function init() {
+      // nombres
+      const names = JSON.parse(localStorage.getItem(LS_NAMES) || "[]")
+      if (!names.length) {
+        document.getElementById("nameModal").style.display = "flex"
       } else {
-        setHeaderNames(names);
-        setRandomTip(names);
+        setHeaderNames(names)
+        setRandomTip(names)
       }
-      renderDayPills(1);
-      renderMenuDay(0,1);
-      updateProgressBar();
-    })();
+      // fecha de inicio
+      askStartDateIfNeeded()
+      const idx = getCurrentDayIndex()
+      const week = idx < 7 ? 1 : 2
+      renderDayPills(week)
+      renderMenuDay(idx, week)
+      updateProgressBar()
+    })()
   </script>
 </body>
 </html>
