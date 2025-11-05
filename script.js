@@ -12,9 +12,9 @@ const LS_LANG = LS_PREFIX + "lang";
 const LS_LIKE = LS_PREFIX + "like-foods";
 const LS_DISLIKE = LS_PREFIX + "dislike-foods";
 
-// ⚠️ Reemplaza con tu key de Gemini SOLO para pruebas
-const GEMINI_API_KEY = "AIzaSyCAtFGq6tQLSnh6cZbDzLIRjRLMsWefLF4";
-const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+// 👇 ahora el front NO tiene la key
+// en vez de eso, llamamos al proxy de Netlify
+const GEMINI_PROXY = "/.netlify/functions/gemini";
 
 let weightChart = null;
 let derivedPlan = [];
@@ -318,12 +318,8 @@ function swapCena(idx, week) {
 }
 window.swapCena = swapCena;
 
-// ====== IA: GENERAR CENA ======
+// ====== IA: GENERAR CENA (via Netlify) ======
 async function generateDinnerAI(idx) {
-  if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("REEMPLAZA_")) {
-    showToast(appLang === "en" ? "Add your Gemini API key first" : "Agrega tu API key de Gemini primero");
-    return;
-  }
   const like = localStorage.getItem(LS_LIKE) || "";
   const dislike = localStorage.getItem(LS_DISLIKE) || "";
   const lang = appLang;
@@ -332,12 +328,10 @@ async function generateDinnerAI(idx) {
     : `Crea 1 cena keto (corta) de unas 500-650 kcal. Evita: ${dislike}. Prefiere: ${like}. Responde SOLO con: Título, Ingredientes, Preparación.`;
 
   try {
-    const res = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
+    const res = await fetch(GEMINI_PROXY, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      })
+      body: JSON.stringify({ prompt })
     });
     const data = await res.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
@@ -345,7 +339,6 @@ async function generateDinnerAI(idx) {
       showToast(lang === "en" ? "No response from AI" : "IA no respondió");
       return;
     }
-    // meterlo en la cena del día actual
     const cenaText = document.querySelector("#menuDays #cena-text");
     if (cenaText) {
       cenaText.textContent = text;
@@ -449,7 +442,6 @@ function renderProgreso() {
   note.textContent = appLang === "en" ? "Stored in this browser." : "Se guarda en este navegador.";
   container.appendChild(note);
 
-  // tarjetas por día con colapso
   derivedPlan.forEach((d, idx) => {
     const saved = JSON.parse(localStorage.getItem(LS_PREFIX + "prog-" + idx) || "{}");
     const hasData = saved.peso || saved.cintura || saved.energia || saved.notas;
@@ -553,7 +545,6 @@ function saveProgreso(idx) {
   drawChart();
   updateBodyFatInfo();
 
-  // colapsar
   const form = document.getElementById("prog-form-" + idx);
   const resumen = document.getElementById("prog-resumen-" + idx);
   if (form && resumen) {
@@ -720,7 +711,6 @@ function changeAppLang() {
   const val = document.getElementById("appLang").value;
   appLang = val;
   localStorage.setItem(LS_LANG, val);
-  // refrescar vistas dependientes
   switchTab("menu");
   setRandomTip(localStorage.getItem(LS_NAME) || "");
 }
@@ -785,7 +775,7 @@ function drawChart() {
   const isDark = document.body.getAttribute("data-theme") === "dark";
   const axisColor = isDark ? "rgba(226,232,240,.8)" : "rgba(15,23,42,.7)";
   const gridColor = isDark ? "rgba(226,232,240,.06)" : "rgba(15,23,42,.05)";
-  const fatColor = "#f97316"; // naranja como querías
+  const fatColor = "#f97316";
 
   weightChart = new Chart(ctx, {
     type: "line",
