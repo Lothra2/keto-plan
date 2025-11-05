@@ -1,8 +1,6 @@
 // netlify/functions/gemini.js
-
 exports.handler = async (event, context) => {
   try {
-    // Si entran por GET (desde el navegador) solo decimos que está viva
     if (event.httpMethod === "GET") {
       return {
         statusCode: 200,
@@ -28,6 +26,7 @@ exports.handler = async (event, context) => {
       prompt ||
       "Crea una cena keto sencilla de 500-650 kcal. Dame: Título, Ingredientes y Preparación. Responde en español.";
 
+    // 👇 aquí el cambio importante: gemini-pro
     const resp = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" +
         apiKey,
