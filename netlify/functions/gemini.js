@@ -1,114 +1,91 @@
 // netlify/functions/gemini.js
 
-// Esta versión usa el modelo viejo de la API: text-bison-001
-// y luego transforma la respuesta al formato que espera tu frontend
-// (candidates[0].content.parts[0].text)
+// usamos el modelo que tu cuenta SÍ tiene
+// si algún día te habilitan gemini-1.5-flash, solo cambias este nombre
+const DEFAULT_MODEL = "models/text-bison-001";
 
-exports.handler = async (event, context) => {
+exports.handler = async (event) => {
+  // solo aceptamos POST desde tu frontend
+  if (event.httpMethod !== "POST") {
+    return {
+      statusCode: 200,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ok: true,
+        message: "Gemini function is alive. Send POST with { prompt }.",
+      }),
+    };
+  }
+
   try {
-    // 1) GET de prueba desde el navegador
-    if (event.httpMethod === "GET") {
+    const { prompt } = JSON.parse(event.body || "{}");
+
+    if (!prompt) {
       return {
-        statusCode: 200,
-        body: JSON.stringify({
-          ok: true,
-          message:
-            "Function alive. Send POST with { prompt }. Using text-bison-001."
-        })
+        statusCode: 400,
+        body: JSON.stringify({ error: "Missing prompt" }),
       };
     }
 
-    // 2) POST con prompt
-    const body = JSON.parse(event.body || "{}");
-    const prompt = body.prompt;
     const apiKey = process.env.GEMINI_API_KEY;
-
     if (!apiKey) {
       return {
         statusCode: 500,
-        body: JSON.stringify({ error: "Missing GEMINI_API_KEY in environment" })
+        body: JSON.stringify({ error: "GEMINI_API_KEY not set in Netlify" }),
       };
     }
 
-    const finalPrompt =
-      prompt ||
-      "Crea una cena keto sencilla de 500-650 kcal. Dame: Título, Ingredientes y Preparación. Responde en español.";
+    // endpoint viejo (v1beta) pero que tu cuenta sí tiene
+    const url = `https://generativelanguage.googleapis.com/v1beta/${DEFAULT_MODEL}:generateText?key=${apiKey}`;
 
-    // 👇 Aquí el endpoint de la API vieja
-    const resp = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta2/models/text-bison-001:generateText?key=" +
-        apiKey,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: {
-            text: finalPrompt
-          },
-          temperature: 0.9,
-          maxOutputTokens: 512
-        })
-      }
-    );
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        prompt: {
+          text: prompt,
+        },
+        // para que responda corto
+        temperature: 0.8,
+        maxOutputTokens: 256,
+      }),
+    });
 
-    const data = await resp.json();
+    const data = await res.json();
 
-    // Si la API vieja respondió con error, lo mandamos al front
-    if (data.error) {
+    // si la API devolvió error, lo mandamos tal cual al front
+    if (!res.ok) {
       return {
-        statusCode: 200,
+        statusCode: res.status,
         body: JSON.stringify({
-          candidates: [
-            {
-              content: {
-                parts: [
-                  {
-                    text:
-                      "La API respondió con un error: " +
-                      (data.error.message || "desconocido")
-                  }
-                ]
-              }
-            }
-          ]
-        })
+          error: data.error?.message || "Error from Google API",
+        }),
       };
     }
 
-    // La API vieja suele devolver data.candidates[0].output
-    const textFromPalm =
-      data.candidates &&
-      data.candidates[0] &&
-      (data.candidates[0].output || data.candidates[0].content)
-        ? data.candidates[0].output || data.candidates[0].content
+    // text-bison responde así:
+    // { candidates: [ { output: "..." } ] }
+    const text =
+      data.candidates && data.candidates[0] && data.candidates[0].output
+        ? data.candidates[0].output
         : "";
 
-    // Devolvemos en FORMATO GEMINI para que tu frontend no cambie
     return {
       statusCode: 200,
       body: JSON.stringify({
-        candidates: [
-          {
-            content: {
-              parts: [
-                {
-                  text:
-                    textFromPalm ||
-                    "No obtuve texto de la API (text-bison-001). Prueba con otro prompt."
-                }
-              ]
-            }
-          }
-        ]
-      })
+        ok: true,
+        text,
+      }),
     };
   } catch (err) {
-    console.error("Gemini/Palm function error:", err);
+    console.error("Gemini function error:", err);
     return {
       statusCode: 500,
-      body: JSON.stringify({
-        error: err.message || "Error calling text-bison-001"
-      })
+      body: JSON.stringify({ error: "Server error calling Gemini" }),
     };
   }
 };
