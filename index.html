@@ -76,6 +76,15 @@
     </div>
 
     <div class="list-row">
+      <strong>Idioma / Language</strong>
+      <p class="small">Elige el idioma para las sugerencias de IA.</p>
+      <select id="appLang" onchange="changeAppLang()">
+        <option value="es">Español</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+
+    <div class="list-row">
       <strong>Duración del plan</strong>
       <p class="small">Elige entre 2 y 4 semanas. Si es más de 2, se repite el menú base.</p>
       <select id="planWeeks" onchange="changePlanWeeks()">
@@ -108,6 +117,14 @@
         <option value="#f97316">Naranja</option>
         <option value="#0ea5e9">Cian</option>
       </select>
+    </div>
+
+    <div class="list-row">
+      <strong>Preferencias de comidas (IA)</strong>
+      <p class="small">La IA las usará para sugerir cenas.</p>
+      <input id="likeFoods" placeholder="Me gusta / I like (pollo, res, huevos)">
+      <input id="dislikeFoods" placeholder="No me gusta / I dislike (camarón, salmón)">
+      <button class="save-btn" onclick="saveFoodPrefs()">Guardar preferencias</button>
     </div>
 
     <div class="list-row">

@@ -8,11 +8,19 @@ const LS_DAILY_VIEW = LS_PREFIX + "daily-view";
 const LS_PRIMARY = LS_PREFIX + "primary-color";
 const LS_HEIGHT = LS_PREFIX + "height-cm";
 const LS_START_WEIGHT = LS_PREFIX + "start-weight";
+const LS_LANG = LS_PREFIX + "lang";
+const LS_LIKE = LS_PREFIX + "like-foods";
+const LS_DISLIKE = LS_PREFIX + "dislike-foods";
+
+// ⚠️ Reemplaza con tu key de Gemini SOLO para pruebas
+const GEMINI_API_KEY = "AIzaSyCAtFGq6tQLSnh6cZbDzLIRjRLMsWefLF4";
+const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
 let weightChart = null;
 let derivedPlan = [];
 let currentWeeks = 2;
 let dailyView = 0;
+let appLang = "es";
 
 // ====== TOAST ======
 const toastEl = document.getElementById("appToast");
@@ -63,12 +71,19 @@ const cenaSwaps = [
   {nombre:"Salmón 140 g con ensalada verde",qty:"140 g salmón, 50 g hojas verdes"}
 ];
 
-const tips = [
+const tipsES = [
   "🥤 Toma agua con un poco de sal.",
   "🥑 Si tienes hambre sube grasa.",
   "🍳 Dos huevos extra están bien.",
   "📸 Foto día 1 y día final.",
   "🧴 Puedes cambiar mantequilla por aceite."
+];
+const tipsEN = [
+  "🥤 Remember to drink water with a pinch of salt.",
+  "🥑 If you feel hungry, increase fats.",
+  "🍳 Two extra eggs are fine.",
+  "📸 Take a picture on day 1 and last day.",
+  "🧴 You can swap butter for olive oil."
 ];
 
 // ====== EJERCICIOS POR SEMANA ======
@@ -98,7 +113,8 @@ function buildPlan(weeks) {
 // ====== TIPS ======
 function setRandomTip(name) {
   const tipBox = document.getElementById("tipBox");
-  const base = tips[Math.floor(Math.random() * tips.length)];
+  const source = appLang === "en" ? tipsEN : tipsES;
+  const base = source[Math.floor(Math.random() * source.length)];
   tipBox.textContent = name ? base + " " + name + "." : base;
 }
 
@@ -109,10 +125,17 @@ function showMotivation() {
   const total = derivedPlan.length;
   const name = localStorage.getItem(LS_NAME) || "";
   let msg = "";
-  if (done === 0) msg = "Inicio es lo más difícil. Ya estás aquí " + (name || "");
-  else if (done < total / 2) msg = "Buen ritmo " + (name || "") + ". Ya tienes " + done + " días.";
-  else if (done < total) msg = "Más de la mitad. Mantén el plan.";
-  else msg = "Plan completado. Haz una foto y compártelo.";
+  if (appLang === "en") {
+    if (done === 0) msg = "Starting is the hardest part. You're here " + (name || "");
+    else if (done < total / 2) msg = "Good pace " + (name || "") + ". You have " + done + " days done.";
+    else if (done < total) msg = "More than half. Keep it up.";
+    else msg = "Plan completed. Take a photo and share.";
+  } else {
+    if (done === 0) msg = "Inicio es lo más difícil. Ya estás aquí " + (name || "");
+    else if (done < total / 2) msg = "Buen ritmo " + (name || "") + ". Ya tienes " + done + " días.";
+    else if (done < total) msg = "Más de la mitad. Mantén el plan.";
+    else msg = "Plan completado. Haz una foto y compártelo.";
+  }
   box.textContent = msg;
   box.style.display = "block";
 }
@@ -129,7 +152,7 @@ function saveNameFromModal() {
 }
 function setHeaderName(name) {
   const sub = document.getElementById("subTitle");
-  sub.textContent = "Para " + name;
+  sub.textContent = (appLang === "en" ? "For " : "Para ") + name;
   const settings = document.getElementById("settingsName");
   if (settings) settings.value = name;
 }
@@ -138,7 +161,7 @@ function applySettingsName() {
   localStorage.setItem(LS_NAME, name);
   setHeaderName(name);
   setRandomTip(name);
-  showToast("Nombre actualizado");
+  showToast(appLang === "en" ? "Name updated" : "Nombre actualizado");
 }
 
 // ====== FECHA INICIO ======
@@ -153,7 +176,7 @@ function changeStartDate() {
   const val = document.getElementById("startDateInput").value;
   if (val) {
     localStorage.setItem(LS_START, val);
-    showToast("Fecha cambiada");
+    showToast(appLang === "en" ? "Start date changed" : "Fecha cambiada");
     switchTab("menu");
   }
 }
@@ -178,7 +201,7 @@ function renderWeekButtons() {
     const btn = document.createElement("div");
     btn.className = "week-btn" + (w === 1 ? " active" : "");
     btn.dataset.week = w;
-    btn.textContent = "Semana " + w + " (" + ((w - 1) * 7 + 1) + "-" + (w * 7) + ")";
+    btn.textContent = (appLang === "en" ? "Week " : "Semana ") + w + " (" + ((w - 1) * 7 + 1) + "-" + (w * 7) + ")";
     ws.appendChild(btn);
   }
   ws.style.display = dailyView ? "none" : "flex";
@@ -208,7 +231,8 @@ function getCompletedCount() {
 }
 function updateProgressBar() {
   const count = getCompletedCount();
-  document.getElementById("progressText").textContent = count + " de " + derivedPlan.length + " días";
+  document.getElementById("progressText").textContent =
+    count + " " + (appLang === "en" ? "of" : "de") + " " + derivedPlan.length + " " + (appLang === "en" ? "days" : "días");
   document.getElementById("progressBar").style.width = (count / derivedPlan.length * 100) + "%";
 }
 
@@ -228,38 +252,39 @@ function renderMenuDay(idx, week) {
     </div>
     <div class="macros">
       <div class="macro">Carbs ${day.macros.carbs}</div>
-      <div class="macro">Prote ${day.macros.prot}</div>
-      <div class="macro">Grasa ${day.macros.fat}</div>
+      <div class="macro">${appLang === "en" ? "Protein" : "Prote"} ${day.macros.prot}</div>
+      <div class="macro">${appLang === "en" ? "Fat" : "Grasa"} ${day.macros.fat}</div>
     </div>
     <div class="food-grid">
       <div class="meal">
-        <div class="meal-title"><span>🍳 Desayuno</span><span class="meal-qty">${day.desayuno.qty}</span></div>
-        <div>${day.desayuno.nombre}</div>
+        <div class="meal-title"><span>🍳 ${appLang === "en" ? "Breakfast" : "Desayuno"}</span><span class="meal-qty">${day.desayuno.qty}</span></div>
+        <div id="desayuno-text">${day.desayuno.nombre}</div>
       </div>
       <div class="meal">
-        <div class="meal-title"><span>⏰ Snack AM</span><span class="meal-qty">${day.snackAM.qty}</span></div>
-        <div>${day.snackAM.nombre}</div>
+        <div class="meal-title"><span>⏰ ${appLang === "en" ? "Snack AM" : "Snack AM"}</span><span class="meal-qty">${day.snackAM.qty}</span></div>
+        <div id="snackam-text">${day.snackAM.nombre}</div>
       </div>
       <div class="meal">
-        <div class="meal-title"><span>🥗 Almuerzo</span><span class="meal-qty">${day.almuerzo.qty}</span></div>
-        <div>${day.almuerzo.nombre}</div>
+        <div class="meal-title"><span>🥗 ${appLang === "en" ? "Lunch" : "Almuerzo"}</span><span class="meal-qty">${day.almuerzo.qty}</span></div>
+        <div id="almuerzo-text">${day.almuerzo.nombre}</div>
       </div>
       <div class="meal">
-        <div class="meal-title"><span>🥜 Snack PM</span><span class="meal-qty">${day.snackPM.qty}</span></div>
-        <div>${day.snackPM.nombre}</div>
+        <div class="meal-title"><span>🥜 ${appLang === "en" ? "Snack PM" : "Snack PM"}</span><span class="meal-qty">${day.snackPM.qty}</span></div>
+        <div id="snackpm-text">${day.snackPM.nombre}</div>
       </div>
       <div class="meal" id="cena-block">
-        <div class="meal-title"><span>🍖 Cena</span><span class="meal-qty" id="cena-qty">${day.cena.qty}</span></div>
+        <div class="meal-title"><span>🍖 ${appLang === "en" ? "Dinner" : "Cena"}</span><span class="meal-qty" id="cena-qty">${day.cena.qty}</span></div>
         <div id="cena-text">${day.cena.nombre}</div>
       </div>
     </div>
     <div class="list-row" style="margin-top:.5rem">
-      <strong>Ejercicios sugeridos semana ${week}</strong>
+      <strong>${appLang === "en" ? "Suggested exercises week" : "Ejercicios sugeridos semana"} ${week}</strong>
       <div class="small">${exercises.map(e => "• " + e).join("<br>")}</div>
     </div>
     <div class="day-actions">
-      <button class="done-btn ${done ? "done" : ""}" onclick="toggleDone(${idx}, ${week})">${done ? "✔ Día completado" : "Marcar día ✔"}</button>
-      <button class="swap-btn" onclick="swapCena(${idx}, ${week})">Cambiar cena 🔁</button>
+      <button class="done-btn ${done ? "done" : ""}" onclick="toggleDone(${idx}, ${week})">${done ? (appLang === "en" ? "✔ Day completed" : "✔ Día completado") : (appLang === "en" ? "Mark day ✔" : "Marcar día ✔")}</button>
+      <button class="swap-btn" onclick="swapCena(${idx}, ${week})">${appLang === "en" ? "Change dinner 🔁" : "Cambiar cena 🔁"}</button>
+      <button class="ia-btn" onclick="generateDinnerAI(${idx})">${appLang === "en" ? "Dinner AI 🤖" : "Cena IA 🤖"}</button>
     </div>
   `;
   menuDays.appendChild(card);
@@ -293,6 +318,46 @@ function swapCena(idx, week) {
 }
 window.swapCena = swapCena;
 
+// ====== IA: GENERAR CENA ======
+async function generateDinnerAI(idx) {
+  if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("REEMPLAZA_")) {
+    showToast(appLang === "en" ? "Add your Gemini API key first" : "Agrega tu API key de Gemini primero");
+    return;
+  }
+  const like = localStorage.getItem(LS_LIKE) || "";
+  const dislike = localStorage.getItem(LS_DISLIKE) || "";
+  const lang = appLang;
+  const prompt = lang === "en"
+    ? `Create 1 keto dinner (short) around 500-650 kcal. Avoid: ${dislike}. Prefer: ${like}. Respond ONLY with: Title, Ingredients, Instructions.`
+    : `Crea 1 cena keto (corta) de unas 500-650 kcal. Evita: ${dislike}. Prefiere: ${like}. Responde SOLO con: Título, Ingredientes, Preparación.`;
+
+  try {
+    const res = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
+    });
+    const data = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    if (!text) {
+      showToast(lang === "en" ? "No response from AI" : "IA no respondió");
+      return;
+    }
+    // meterlo en la cena del día actual
+    const cenaText = document.querySelector("#menuDays #cena-text");
+    if (cenaText) {
+      cenaText.textContent = text;
+    }
+    showToast(lang === "en" ? "AI dinner updated" : "Cena IA actualizada");
+  } catch (e) {
+    console.error(e);
+    showToast(lang === "en" ? "Error calling AI" : "Error llamando a la IA");
+  }
+}
+window.generateDinnerAI = generateDinnerAI;
+
 // ====== COMPRAS ======
 function renderCompras() {
   const container = document.getElementById("compras");
@@ -301,12 +366,18 @@ function renderCompras() {
   const dash = document.createElement("div");
   dash.className = "list-row";
   dash.innerHTML = `
-    <strong>Resumen rápido</strong>
-    <div class="small">Días completados: ${done} de ${derivedPlan.length}</div>
+    <strong>${appLang === "en" ? "Quick summary" : "Resumen rápido"}</strong>
+    <div class="small">${appLang === "en" ? "Completed days" : "Días completados"}: ${done} ${appLang === "en" ? "of" : "de"} ${derivedPlan.length}</div>
   `;
   container.appendChild(dash);
 
-  const list = [
+  const list = appLang === "en" ? [
+    {cat:"Proteins",items:"Eggs, chicken, salmon, shrimp, beef, greek yogurt"},
+    {cat:"Veggies",items:"Broccoli, cauliflower, cherry tomato, rocket, avocado, mushrooms"},
+    {cat:"Healthy fats",items:"Butter, olive oil, heavy cream, feta cheese"},
+    {cat:"Snacks",items:"Cashews, nuts, chia, shredded coconut"},
+    {cat:"Others",items:"Sugar-free coffee, pink salt, lemon"}
+  ] : [
     {cat:"Proteínas",items:"Huevos, pollo, salmón, camarones, carne de res, yogur griego"},
     {cat:"Verduras",items:"Brócoli, coliflor, tomate cherry, rúcula/rocket, aguacate, champiñón"},
     {cat:"Grasas buenas",items:"Mantequilla, aceite de oliva, crema de leche, queso feta"},
@@ -346,11 +417,11 @@ function renderProgreso() {
   const baseBox = document.createElement("div");
   baseBox.className = "list-row";
   baseBox.innerHTML = `
-    <strong>Datos base</strong>
-    <p class="small">Pon tu estatura y tu peso inicial para calcular % de grasa aproximado.</p>
-    <input type="number" id="heightCm" placeholder="Estatura (cm)" value="${heightSaved}">
-    <input type="number" id="startWeight" placeholder="Peso inicial (kg)" value="${startWeightSaved}">
-    <button class="save-btn" onclick="saveBaseProgress()">Guardar datos base</button>
+    <strong>${appLang === "en" ? "Base data" : "Datos base"}</strong>
+    <p class="small">${appLang === "en" ? "Enter your height and initial weight to estimate body fat." : "Pon tu estatura y tu peso inicial para calcular % de grasa aproximado."}</p>
+    <input type="number" id="heightCm" placeholder="${appLang === "en" ? "Height (cm)" : "Estatura (cm)"}" value="${heightSaved}">
+    <input type="number" id="startWeight" placeholder="${appLang === "en" ? "Initial weight (kg)" : "Peso inicial (kg)"}" value="${startWeightSaved}">
+    <button class="save-btn" onclick="saveBaseProgress()">${appLang === "en" ? "Save base data" : "Guardar datos base"}</button>
     <p class="small" id="bfInfo"></p>
   `;
   container.appendChild(baseBox);
@@ -358,9 +429,9 @@ function renderProgreso() {
   const shareBox = document.createElement("div");
   shareBox.className = "list-row";
   shareBox.innerHTML = `
-    <strong>Compartir resultados</strong>
-    <p class="small">Genera un resumen para enviar por WhatsApp o correo.</p>
-    <button class="save-btn" onclick="shareProgress()">Compartir progreso</button>
+    <strong>${appLang === "en" ? "Share results" : "Compartir resultados"}</strong>
+    <p class="small">${appLang === "en" ? "Create a summary to share." : "Genera un resumen para enviar por WhatsApp o correo."}</p>
+    <button class="save-btn" onclick="shareProgress()">${appLang === "en" ? "Share progress" : "Compartir progreso"}</button>
   `;
   container.appendChild(shareBox);
 
@@ -375,20 +446,33 @@ function renderProgreso() {
 
   const note = document.createElement("div");
   note.className = "list-row";
-  note.textContent = "Se guarda en este navegador.";
+  note.textContent = appLang === "en" ? "Stored in this browser." : "Se guarda en este navegador.";
   container.appendChild(note);
 
+  // tarjetas por día con colapso
   derivedPlan.forEach((d, idx) => {
     const saved = JSON.parse(localStorage.getItem(LS_PREFIX + "prog-" + idx) || "{}");
+    const hasData = saved.peso || saved.cintura || saved.energia || saved.notas;
     const card = document.createElement("div");
     card.className = "day-card";
     card.innerHTML = `
       <div class="day-title"><h2>${d.dia}</h2><span class="kcal">${d.kcal} kcal</span></div>
-      <input type="number" placeholder="Peso (kg)" id="peso-${idx}" value="${saved.peso || ""}">
-      <input type="number" placeholder="Cintura (cm)" id="cintura-${idx}" value="${saved.cintura || ""}">
-      <input type="number" placeholder="Energía (1-10)" id="energia-${idx}" value="${saved.energia || ""}">
-      <textarea placeholder="Notas" id="nota-${idx}">${saved.notas || ""}</textarea>
-      <button class="save-btn" onclick="saveProgreso(${idx})">Guardar</button>
+      <div class="prog-form" id="prog-form-${idx}" ${hasData ? 'style="display:none"' : ''}>
+        <input type="number" placeholder="${appLang === "en" ? "Weight (kg)" : "Peso (kg)"}" id="peso-${idx}" value="${saved.peso || ""}">
+        <input type="number" placeholder="${appLang === "en" ? "Waist (cm)" : "Cintura (cm)"}" id="cintura-${idx}" value="${saved.cintura || ""}">
+        <input type="number" placeholder="${appLang === "en" ? "Energy (1-10)" : "Energía (1-10)"}" id="energia-${idx}" value="${saved.energia || ""}">
+        <textarea placeholder="${appLang === "en" ? "Notes" : "Notas"}" id="nota-${idx}">${saved.notas || ""}</textarea>
+        <button class="save-btn" onclick="saveProgreso(${idx})">${appLang === "en" ? "Save" : "Guardar"}</button>
+      </div>
+      <div class="prog-resumen" id="prog-resumen-${idx}" ${hasData ? "" : 'style="display:none"'}>
+        <p class="small">
+          ${saved.peso ? (appLang === "en" ? `Weight: ${saved.peso} kg` : `Peso: ${saved.peso} kg`) : ""}
+          ${saved.cintura ? (appLang === "en" ? ` | Waist: ${saved.cintura} cm` : ` | Cintura: ${saved.cintura} cm`) : ""}
+          ${saved.energia ? (appLang === "en" ? ` | Energy: ${saved.energia}` : ` | Energía: ${saved.energia}`) : ""}
+        </p>
+        ${saved.notas ? `<p class="small">${appLang === "en" ? "Notes: " : "Notas: "}${saved.notas}</p>` : ""}
+        <button class="save-btn" onclick="editarProgreso(${idx})">${appLang === "en" ? "Edit" : "Editar"}</button>
+      </div>
     `;
     container.appendChild(card);
   });
@@ -402,7 +486,7 @@ function saveBaseProgress() {
   const sw = document.getElementById("startWeight").value;
   if (h) localStorage.setItem(LS_HEIGHT, h);
   if (sw) localStorage.setItem(LS_START_WEIGHT, sw);
-  showToast("Datos base guardados");
+  showToast(appLang === "en" ? "Base data saved" : "Datos base guardados");
   updateBodyFatInfo();
   drawChart();
 }
@@ -422,7 +506,7 @@ function updateBodyFatInfo() {
   if (h && lastWeight) {
     const bf = estimateBodyFat(h, lastWeight);
     if (bf) {
-      el.textContent = "Estimación de grasa corporal: " + bf + " %";
+      el.textContent = (appLang === "en" ? "Estimated body fat: " : "Estimación de grasa corporal: ") + bf + " %";
     } else {
       el.textContent = "";
     }
@@ -432,7 +516,7 @@ function updateBodyFatInfo() {
 }
 
 function shareProgress() {
-  const name = localStorage.getItem(LS_NAME) || "Mi progreso Keto";
+  const name = localStorage.getItem(LS_NAME) || (appLang === "en" ? "My keto progress" : "Mi progreso Keto");
   const done = getCompletedCount();
   const lastIdx = derivedPlan.length - 1;
   let lastPeso = "";
@@ -443,14 +527,16 @@ function shareProgress() {
       break;
     }
   }
-  const text = name + " está haciendo el plan keto. Días completados: " + done + " de " + derivedPlan.length + (lastPeso ? (". Peso más reciente: " + lastPeso + " kg.") : ".") + " (guardado en el navegador).";
+  const text = appLang === "en"
+    ? `${name} is doing the keto plan. Completed days: ${done} of ${derivedPlan.length}${lastPeso ? (". Latest weight: " + lastPeso + " kg.") : "."} (saved in this browser).`
+    : `${name} está haciendo el plan keto. Días completados: ${done} de ${derivedPlan.length}${lastPeso ? (". Peso más reciente: " + lastPeso + " kg.") : "."} (guardado en el navegador).`;
   if (navigator.share) {
     navigator.share({
-      title: "Progreso keto de " + name,
+      title: appLang === "en" ? "My keto progress" : "Progreso keto",
       text: text
     }).catch(() => {});
   } else {
-    showToast("Copia el texto:\n" + text);
+    showToast(text, 4000);
   }
 }
 window.shareProgress = shareProgress;
@@ -463,11 +549,42 @@ function saveProgreso(idx) {
     notas: document.getElementById("nota-" + idx).value
   };
   localStorage.setItem(LS_PREFIX + "prog-" + idx, JSON.stringify(data));
-  showToast("Guardado ✅");
+  showToast(appLang === "en" ? "Saved ✅" : "Guardado ✅");
   drawChart();
   updateBodyFatInfo();
+
+  // colapsar
+  const form = document.getElementById("prog-form-" + idx);
+  const resumen = document.getElementById("prog-resumen-" + idx);
+  if (form && resumen) {
+    form.style.display = "none";
+    resumen.style.display = "block";
+    let html = "";
+    if (data.peso) html += (appLang === "en" ? `Weight: ${data.peso} kg` : `Peso: ${data.peso} kg`);
+    if (data.cintura) html += (appLang === "en" ? ` | Waist: ${data.cintura} cm` : ` | Cintura: ${data.cintura} cm`);
+    if (data.energia) html += (appLang === "en" ? ` | Energy: ${data.energia}` : ` | Energía: ${data.energia}`);
+    resumen.querySelector("p.small").innerHTML = html;
+    const notasP = resumen.querySelectorAll("p.small")[1];
+    if (notasP) notasP.remove();
+    if (data.notas) {
+      const np = document.createElement("p");
+      np.className = "small";
+      np.textContent = (appLang === "en" ? "Notes: " : "Notas: ") + data.notas;
+      resumen.insertBefore(np, resumen.querySelector("button.save-btn"));
+    }
+  }
 }
 window.saveProgreso = saveProgreso;
+
+function editarProgreso(idx) {
+  const form = document.getElementById("prog-form-" + idx);
+  const resumen = document.getElementById("prog-resumen-" + idx);
+  if (form && resumen) {
+    form.style.display = "block";
+    resumen.style.display = "none";
+  }
+}
+window.editarProgreso = editarProgreso;
 
 // ====== TABS ======
 function switchTab(target) {
@@ -510,6 +627,9 @@ function switchTab(target) {
     document.getElementById("dailyView").value = dailyView;
     const pColor = localStorage.getItem(LS_PRIMARY) || "#0f766e";
     document.getElementById("primaryColor").value = pColor;
+    document.getElementById("appLang").value = appLang;
+    document.getElementById("likeFoods").value = localStorage.getItem(LS_LIKE) || "";
+    document.getElementById("dislikeFoods").value = localStorage.getItem(LS_DISLIKE) || "";
   }
 }
 
@@ -558,7 +678,7 @@ function changePrimaryColor() {
   const val = document.getElementById("primaryColor").value;
   document.documentElement.style.setProperty("--primary", val);
   localStorage.setItem(LS_PRIMARY, val);
-  showToast("Color actualizado");
+  showToast(appLang === "en" ? "Color updated" : "Color actualizado");
   if (document.getElementById("progreso").style.display === "block") {
     drawChart();
   }
@@ -577,7 +697,7 @@ function changePlanWeeks() {
   }
   renderMenuDay(idx, week);
   updateProgressBar();
-  showToast("Plan actualizado a " + val + " semanas");
+  showToast(appLang === "en" ? "Plan updated" : "Plan actualizado a " + val + " semanas");
 }
 function setWeekActive(week) {
   document.querySelectorAll(".week-btn").forEach(b => {
@@ -591,10 +711,29 @@ function resetAll() {
     if (k && k.startsWith(LS_PREFIX)) keys.push(k);
   }
   keys.forEach(k => localStorage.removeItem(k));
-  showToast("Todo borrado");
+  showToast(appLang === "en" ? "All cleared" : "Todo borrado");
   setTimeout(() => location.reload(), 500);
 }
 window.resetAll = resetAll;
+
+function changeAppLang() {
+  const val = document.getElementById("appLang").value;
+  appLang = val;
+  localStorage.setItem(LS_LANG, val);
+  // refrescar vistas dependientes
+  switchTab("menu");
+  setRandomTip(localStorage.getItem(LS_NAME) || "");
+}
+window.changeAppLang = changeAppLang;
+
+function saveFoodPrefs() {
+  const like = document.getElementById("likeFoods").value.trim();
+  const dislike = document.getElementById("dislikeFoods").value.trim();
+  localStorage.setItem(LS_LIKE, like);
+  localStorage.setItem(LS_DISLIKE, dislike);
+  showToast(appLang === "en" ? "Food preferences saved" : "Preferencias guardadas");
+}
+window.saveFoodPrefs = saveFoodPrefs;
 
 // ====== ANIMACIONES ======
 function animateCards() {
@@ -646,7 +785,7 @@ function drawChart() {
   const isDark = document.body.getAttribute("data-theme") === "dark";
   const axisColor = isDark ? "rgba(226,232,240,.8)" : "rgba(15,23,42,.7)";
   const gridColor = isDark ? "rgba(226,232,240,.06)" : "rgba(15,23,42,.05)";
-  const fatColor = isDark ? "#f97316" : "#ea580c";
+  const fatColor = "#f97316"; // naranja como querías
 
   weightChart = new Chart(ctx, {
     type: "line",
@@ -654,7 +793,7 @@ function drawChart() {
       labels,
       datasets: [
         {
-          label: "Peso (kg)",
+          label: appLang === "en" ? "Weight (kg)" : "Peso (kg)",
           data: weightData,
           borderWidth: 2,
           borderColor: getPrimaryColor(),
@@ -664,7 +803,7 @@ function drawChart() {
           pointHoverRadius: 4
         },
         {
-          label: "% Grasa (est.)",
+          label: appLang === "en" ? "Body fat (%) est." : "% Grasa (est.)",
           data: bodyFatData,
           borderWidth: 2,
           borderColor: fatColor,
@@ -684,7 +823,7 @@ function drawChart() {
           display: true,
           labels: {
             color: axisColor,
-            usePointStyle: true,        // <-- puntito bonito
+            usePointStyle: true,
             pointStyle: "circle",
             boxWidth: 8
           }
@@ -730,7 +869,7 @@ function drawChart() {
           },
           title: {
             display: true,
-            text: "% grasa",
+            text: appLang === "en" ? "% fat" : "% grasa",
             color: axisColor,
             font: { size: 10 }
           },
@@ -748,6 +887,9 @@ function drawChart() {
   if (savedPrimary) {
     document.documentElement.style.setProperty("--primary", savedPrimary);
   }
+
+  const savedLang = localStorage.getItem(LS_LANG);
+  appLang = savedLang || "es";
 
   const savedWeeks = Number(localStorage.getItem(LS_PLAN_WEEKS) || "2");
   currentWeeks = savedWeeks >= 2 && savedWeeks <= 4 ? savedWeeks : 2;
@@ -777,7 +919,5 @@ function drawChart() {
   renderMenuDay(idx, week);
   updateProgressBar();
   showMotivation();
-
-  // por si había quedado toast viejo
   hideToast();
 })();
