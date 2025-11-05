@@ -322,6 +322,7 @@ async function generateDinnerAI(idx) {
   const like = localStorage.getItem(LS_LIKE) || "";
   const dislike = localStorage.getItem(LS_DISLIKE) || "";
   const lang = appLang;
+
   const prompt =
     lang === "en"
       ? `Create 1 keto dinner (short) around 500-650 kcal. Avoid: ${dislike}. Prefer: ${like}. Respond ONLY with: Title, Ingredients, Instructions.`
@@ -331,21 +332,23 @@ async function generateDinnerAI(idx) {
     const res = await fetch(GEMINI_PROXY, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify({ prompt }),
     });
 
     const data = await res.json();
 
-    const text =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      data?.error?.message ||
-      "";
-
-    if (!text) {
-      showToast(lang === "en" ? "AI did not respond" : "IA no respondió");
+    // si la función de Netlify dijo "error", lo mostramos
+    if (!res.ok || !data.ok) {
+      const msg =
+        data.error ||
+        (lang === "en" ? "AI did not respond" : "IA no respondió");
+      showToast(msg);
       return;
     }
 
+    const text = data.text || "";
+
+    // meterlo en la cena del día actual
     const cenaText = document.querySelector("#menuDays #cena-text");
     if (cenaText) {
       cenaText.textContent = text;
