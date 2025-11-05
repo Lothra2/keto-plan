@@ -12,8 +12,8 @@ const LS_LANG = LS_PREFIX + "lang";
 const LS_LIKE = LS_PREFIX + "like-foods";
 const LS_DISLIKE = LS_PREFIX + "dislike-foods";
 
-// 👇 ahora usamos el proxy de Netlify, no la key en el front
-const GEMINI_PROXY = "/.netlify/functions/gemini";
+// 👇 ahora usamos el proxy de Netlify hacia Grok
+const GROK_PROXY = "/.netlify/functions/grok";
 
 let weightChart = null;
 let derivedPlan = [];
@@ -317,7 +317,33 @@ function swapCena(idx, week) {
 }
 window.swapCena = swapCena;
 
-// ====== IA: GENERAR CENA ======
+// ====== IA: PARSEAR RESPUESTA DE GROK ======
+function extractGrokText(resp) {
+  if (!resp) return "";
+  // si la función de Netlify nos envía {success:true, data:{...}}
+  if (resp.data) {
+    const d = resp.data;
+    // algunas respuestas de xAI traen output_text directo
+    if (d.output_text) return d.output_text;
+    // otras traen "output" como array
+    if (Array.isArray(d.output) && d.output.length > 0) {
+      const first = d.output[0];
+      if (first && Array.isArray(first.content)) {
+        const textPart = first.content.find(c => c.type === "output_text" || c.type === "text");
+        if (textPart && textPart.text) return textPart.text;
+      }
+    }
+    // estilo openai-like: choices[0].message.content
+    if (Array.isArray(d.choices) && d.choices[0]?.message?.content) {
+      return d.choices[0].message.content;
+    }
+  }
+  // si vino directo text
+  if (resp.text) return resp.text;
+  return "";
+}
+
+// ====== IA: GENERAR CENA CON GROK ======
 async function generateDinnerAI(idx) {
   const like = localStorage.getItem(LS_LIKE) || "";
   const dislike = localStorage.getItem(LS_DISLIKE) || "";
@@ -329,29 +355,29 @@ async function generateDinnerAI(idx) {
       : `Crea 1 cena keto (corta) de unas 500-650 kcal. Evita: ${dislike}. Prefiere: ${like}. Responde SOLO con: Título, Ingredientes, Preparación.`;
 
   try {
-    const res = await fetch(GEMINI_PROXY, {
+    const res = await fetch(GROK_PROXY, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt })
     });
 
-    const data = await res.json();
+    const payload = await res.json();
 
-    // si la función de Netlify dijo "error", lo mostramos
-    if (!res.ok || !data.ok) {
-      const msg =
-        data.error ||
-        (lang === "en" ? "AI did not respond" : "IA no respondió");
-      showToast(msg);
+    if (!res.ok) {
+      showToast(lang === "en" ? "AI did not respond" : "IA no respondió");
       return;
     }
 
-    const text = data.text || "";
+    const aiText = extractGrokText(payload);
 
-    // meterlo en la cena del día actual
+    if (!aiText) {
+      showToast(lang === "en" ? "AI did not return text" : "La IA no devolvió texto");
+      return;
+    }
+
     const cenaText = document.querySelector("#menuDays #cena-text");
     if (cenaText) {
-      cenaText.textContent = text;
+      cenaText.textContent = aiText.trim();
     }
     showToast(lang === "en" ? "AI dinner updated" : "Cena IA actualizada");
   } catch (e) {
