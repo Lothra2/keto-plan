@@ -1,7 +1,8 @@
 // netlify/functions/gemini.js
+
 exports.handler = async (event, context) => {
   try {
-    // 1) Si alguien entra con GET en el navegador, solo respondemos que está viva
+    // Si entran por GET (desde el navegador) solo decimos que está viva
     if (event.httpMethod === "GET") {
       return {
         statusCode: 200,
@@ -12,7 +13,6 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // 2) Leemos el body del POST
     const body = JSON.parse(event.body || "{}");
     const prompt = body.prompt;
     const apiKey = process.env.GEMINI_API_KEY;
@@ -24,12 +24,10 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Si no mandaron prompt desde el front, ponemos uno por defecto
     const finalPrompt =
       prompt ||
       "Crea una cena keto sencilla de 500-650 kcal. Dame: Título, Ingredientes y Preparación. Responde en español.";
 
-    // Llamada a Gemini
     const resp = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" +
         apiKey,
@@ -52,7 +50,6 @@ exports.handler = async (event, context) => {
 
     const data = await resp.json();
 
-    // devolvemos tal cual a tu frontend
     return {
       statusCode: 200,
       body: JSON.stringify(data)
@@ -61,7 +58,9 @@ exports.handler = async (event, context) => {
     console.error("Gemini function error:", err);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: err.message || "Error calling Gemini API" })
+      body: JSON.stringify({
+        error: err.message || "Error calling Gemini API"
+      })
     };
   }
 };
