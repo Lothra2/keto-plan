@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Plan Keto 14 días</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --primary: #0f766e;
+      --primary-soft: rgba(15, 118, 110, .1);
+      --bg: #0f172a;
+      --card: #0f172a;
+      --text: #e2e8f0;
+      --muted: rgba(226, 232, 240, .5);
+      --radius: 1.05rem;
+    }
+    [data-theme="light"] {
+      --primary: #0f766e;
+      --primary-soft: rgba(15, 118, 110, .08);
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: rgba(15, 23, 42, .55);
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, rgba(15,118,110,.25), var(--bg) 40%);
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: 70px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: .9rem 1rem .5rem;
+      gap: .8rem;
+      backdrop-filter: blur(10px);
+      background: rgba(15, 23, 42, .4);
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    [data-theme="light"] header {
+      background: rgba(241, 245, 249, .7);
+    }
+    .head-left {
+      flex: 1;
+    }
+    h1 {
+      font-size: 1.1rem;
+      margin: 0;
+    }
+    .sub {
+      font-size: .73rem;
+      opacity: .8;
+      margin-top: .2rem;
+    }
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: .3rem;
+      font-size: .65rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .toggle input {
+      display: none;
+    }
+    .ball {
+      width: 40px;
+      height: 20px;
+      background: rgba(226,232,240,.2);
+      border-radius: 999px;
+      position: relative;
+    }
+    .ball::after {
+      content: "";
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: left .28s;
+    }
+    input:checked + .ball {
+      background: rgba(15,118,110,.85);
+    }
+    input:checked + .ball::after {
+      left: 22px;
+    }
+
+    .hero {
+      padding: .5rem 1rem .5rem;
+    }
+    .tip {
+      background: linear-gradient(120deg, rgba(249,115,22,.15), rgba(15,118,110,.12));
+      border: 1px solid rgba(15,118,110,.21);
+      border-radius: .9rem;
+      padding: .55rem .65rem .4rem;
+      font-size: .7rem;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+
+    .tabs {
+      display: flex;
+      gap: .4rem;
+      padding: .4rem 1rem 0;
+      overflow-x: auto;
+    }
+    .tab {
+      border: none;
+      background: transparent;
+      padding: .4rem .75rem .45rem;
+      border-radius: 999px;
+      font-size: .7rem;
+      font-weight: 500;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    .tab.active {
+      background: rgba(15, 118, 110, .15);
+      color: var(--text);
+    }
+
+    .container {
+      padding: .7rem 1rem 1.2rem;
+    }
+
+    .week-switch {
+      display: flex;
+      gap: .5rem;
+      margin-bottom: .6rem;
+    }
+    .week-btn {
+      flex: 1;
+      border: 1px solid rgba(148,163,184,.2);
+      background: rgba(15,118,110,.03);
+      border-radius: .8rem;
+      padding: .4rem .3rem .45rem;
+      font-size: .68rem;
+      text-align: center;
+      cursor: pointer;
+    }
+    .week-btn.active {
+      background: rgba(15,118,110,.3);
+      border-color: transparent;
+      color: #fff;
+    }
+
+    .day-floating {
+      display: flex;
+      gap: .4rem;
+      overflow-x: auto;
+      margin-bottom: .65rem;
+    }
+    .day-pill {
+      background: rgba(15,118,110,.03);
+      border: 1px solid rgba(148,163,184,.1);
+      border-radius: 999px;
+      padding: .25rem .8rem;
+      font-size: .65rem;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .day-pill.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: transparent;
+    }
+
+    .day-card {
+      background: radial-gradient(circle at top, rgba(15,118,110,.25), var(--card));
+      border: 1px solid rgba(148,163,184,.08);
+      border-radius: var(--radius);
+      padding: .9rem .8rem .75rem;
+      margin-bottom: .7rem;
+      opacity: 0;
+      transform: translateY(15px);
+      transition: all .35s ease;
+    }
+    .day-card.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .day-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .5rem;
+      margin-bottom: .35rem;
+    }
+    .day-title h2 {
+      font-size: .85rem;
+      margin: 0;
+    }
+    .kcal {
+      font-size: .62rem;
+      opacity: .7;
+    }
+
+    .macros {
+      display: flex;
+      gap: .4rem;
+      margin-bottom: .4rem;
+    }
+    .macro {
+      background: rgba(15,118,110,.08);
+      border-radius: .5rem;
+      padding: .28rem .55rem;
+      font-size: .6rem;
+      display: flex;
+      flex-direction: column;
+      gap: .1rem;
+    }
+    .macro small {
+      opacity: .65;
+      font-size: .56rem;
+    }
+
+    .progress-bar {
+      height: 6px;
+      background: rgba(15,118,110,.06);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: .55rem;
+    }
+    .progress-bar span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #0f766e, #f97316);
+      width: 75%;
+    }
+
+    .food-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: .45rem;
+    }
+    .meal {
+      background: rgba(15, 23, 42, .2);
+      border: 1px solid rgba(15,118,110,.04);
+      border-radius: .6rem;
+      padding: .55rem .55rem .4rem;
+      font-size: .68rem;
+    }
+    [data-theme="light"] .meal {
+      background: rgba(255,255,255,.4);
+    }
+    .meal-title {
+      font-weight: 600;
+      margin-bottom: .15rem;
+      display: flex;
+      justify-content: space-between;
+      gap: .4rem;
+    }
+    .meal-qty {
+      font-size: .58rem;
+      opacity: .6;
+      text-align: right;
+    }
+    .meal-desc {
+      opacity: .9;
+    }
+
+    .list-row {
+      background: rgba(15,23,42,.3);
+      border: 1px solid rgba(148,163,184,.08);
+      border-radius: .7rem;
+      padding: .55rem .6rem .35rem;
+      font-size: .7rem;
+      margin-bottom: .55rem;
+    }
+    [data-theme="light"] .list-row {
+      background: rgba(255,255,255,.7);
+    }
+    .small {
+      font-size: .62rem;
+      opacity: .85;
+    }
+
+    input, textarea {
+      width: 100%;
+      background: rgba(15,23,42,.2);
+      border: 1px solid rgba(148,163,184,.25);
+      border-radius: .5rem;
+      padding: .5rem .45rem;
+      color: inherit;
+      font-size: .65rem;
+      margin-bottom: .4rem;
+    }
+    button.save-btn {
+      width: 100%;
+      background: var(--primary);
+      border: none;
+      color: #fff;
+      padding: .45rem .6rem .5rem;
+      border-radius: .5rem;
+      font-weight: 600;
+      font-size: .65rem;
+      cursor: pointer;
+    }
+
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(15,23,42,.9);
+      display: flex;
+      justify-content: space-around;
+      gap: .5rem;
+      padding: .25rem .5rem .3rem;
+      z-index: 60;
+      backdrop-filter: blur(10px);
+    }
+    [data-theme="light"] .bottom-nav {
+      background: rgba(241,245,249,.9);
+    }
+    .bottom-btn {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: .6rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .15rem;
+      padding: .25rem .4rem;
+      border-radius: .4rem;
+    }
+    .bottom-btn.active {
+      color: var(--text);
+      background: rgba(15,118,110,.15);
+    }
+    .icon {
+      font-size: 1.05rem;
+      line-height: 1;
+    }
+
+    @media (min-width: 700px) {
+      body {
+        padding-bottom: 0;
+      }
+      .bottom-nav {
+        display: none;
+      }
+      .food-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .container {
+        max-width: 760px;
+        margin: 0 auto;
+      }
+      header, .hero, .tabs {
+        max-width: 760px;
+        margin: 0 auto;
+      }
+    }
+  </style>
+</head>
+<body data-theme="dark">
+  <header>
+    <div class="head-left">
+      <h1>Plan Keto 14 días 🥑</h1>
+      <p class="sub">Para Rick y Steph, versión móvil</p>
+    </div>
+    <label class="toggle" title="Modo claro/oscuro">
+      <input type="checkbox" id="themeToggle">
+      <span class="ball"></span>
+    </label>
+  </header>
+
+  <div class="hero">
+    <div class="tip" id="tipBox">🥤 Recuerda tomar agua con sal rosada en estos días.</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="menu">Menú</button>
+    <button class="tab" data-tab="compras">Compras</button>
+    <button class="tab" data-tab="progreso">Progreso</button>
+  </div>
+
+  <div class="container" id="menu">
+    <div class="week-switch">
+      <div class="week-btn active" data-week="1">Semana 1 (días 1-7)</div>
+      <div class="week-btn" data-week="2">Semana 2 (días 8-14)</div>
+    </div>
+    <div class="day-floating" id="dayFloating"></div>
+    <div id="menuDays"></div>
+  </div>
+
+  <div class="container" id="compras" style="display:none"></div>
+  <div class="container" id="progreso" style="display:none"></div>
+
+  <div class="bottom-nav">
+    <button class="bottom-btn active" data-tab="menu">
+      <span class="icon">🍽</span>
+      Menú
+    </button>
+    <button class="bottom-btn" data-tab="compras">
+      <span class="icon">🛒</span>
+      Compras
+    </button>
+    <button class="bottom-btn" data-tab="progreso">
+      <span class="icon">📈</span>
+      Progreso
+    </button>
+  </div>
+
+  <script>
+    const plan = [
+      {
+        dia: "Día 1",
+        kcal: 1650,
+        macros: {carbs: "7%", prot: "25%", fat: "68%"},
+        desayuno: {nombre: "Huevos con aguacate y feta", qty: "2 huevos, 1/2 aguacate, 30 g feta, 5 g mantequilla", desc: "Proteína y grasa para empezar."},
+        snackAM: {nombre: "Yogur griego con marañones", qty: "120 g yogur, 20 g marañones", desc: ""},
+        almuerzo: {nombre: "Salmón con brócoli", qty: "150 g salmón, 120 g brócoli, 10 g mantequilla", desc: "Omega 3."},
+        snackPM: {nombre: "Feta con tomate cherry", qty: "30 g feta, 4 tomates", desc: ""},
+        cena: {nombre: "Bife de res con rocket y aguacate", qty: "160 g res, 40 g rocket, 1/2 aguacate", desc: "Cierre con proteína."}
+      },
+      {
+        dia: "Día 2",
+        kcal: 1600,
+        macros: {carbs: "8%", prot: "24%", fat: "68%"},
+        desayuno: {nombre: "Omelette feta y tomate", qty: "2-3 huevos, 30 g feta, 40 g tomate", desc: ""},
+        snackAM: {nombre: "Marañones y café", qty: "20 g marañones", desc: ""},
+        almuerzo: {nombre: "Pollo a la parrilla con rocket", qty: "150 g pollo, 50 g rocket, 1/2 aguacate", desc: ""},
+        snackPM: {nombre: "Yogur con coco", qty: "120 g yogur, 10 g coco", desc: ""},
+        cena: {nombre: "Camarones al ajillo con coliflor", qty: "140 g camarón, 120 g coliflor", desc: ""}
+      },
+      {
+        dia: "Día 3",
+        kcal: 1580,
+        macros: {carbs: "6%", prot: "26%", fat: "68%"},
+        desayuno: {nombre: "Yogur con nueces y chía", qty: "150 g yogur, 15 g nueces, 5 g chía", desc: ""},
+        snackAM: {nombre: "Feta y aguacate", qty: "25 g feta, 30 g aguacate", desc: ""},
+        almuerzo: {nombre: "Hamburguesa sin pan con rocket", qty: "150 g carne, 50 g rocket, 4 tomates", desc: ""},
+        snackPM: {nombre: "Marañones", qty: "20 g", desc: ""},
+        cena: {nombre: "Salmón con brócoli y mantequilla", qty: "150 g salmón, 120 g brócoli, 5 g mantequilla", desc: ""}
+      },
+      {
+        dia: "Día 4",
+        kcal: 1620,
+        macros: {carbs: "7%", prot: "24%", fat: "69%"},
+        desayuno: {nombre: "Huevos cocidos con aguacate", qty: "2 huevos, 1/2 aguacate", desc: ""},
+        snackAM: {nombre: "Yogur y marañones", qty: "120 g yogur, 20 g marañones", desc: ""},
+        almuerzo: {nombre: "Pollo en crema con champiñón y brócoli", qty: "150 g pollo, 60 g champiñón, 100 g brócoli, 20 ml crema", desc: ""},
+        snackPM: {nombre: "Feta con rocket", qty: "30 g feta, 20 g rocket", desc: ""},
+        cena: {nombre: "Carne roja con rocket y tomate seco", qty: "160 g carne, 40 g rocket, 15 g tomate seco", desc: ""}
+      },
+      {
+        dia: "Día 5",
+        kcal: 1590,
+        macros: {carbs: "8%", prot: "25%", fat: "67%"},
+        desayuno: {nombre: "Omelette con feta y champiñones", qty: "2-3 huevos, 30 g feta, 50 g champiñón", desc: ""},
+        snackAM: {nombre: "Café con crema + marañones", qty: "Café + 10 ml crema + 15 g marañones", desc: ""},
+        almuerzo: {nombre: "Ensalada keto de pollo", qty: "140 g pollo, 1/2 aguacate, 40 g tomate, 40 g rocket", desc: ""},
+        snackPM: {nombre: "Yogur con coco", qty: "120 g yogur, 10 g coco", desc: ""},
+        cena: {nombre: "Camarones con puré de coliflor", qty: "140 g camarón, 120 g coliflor, 10 g mantequilla", desc: ""}
+      },
+      {
+        dia: "Día 6",
+        kcal: 1600,
+        macros: {carbs: "7%", prot: "25%", fat: "68%"},
+        desayuno: {nombre: "Yogur con chía y nueces", qty: "150 g yogur, 5 g chía, 15 g nueces", desc: ""},
+        snackAM: {nombre: "Feta y aguacate", qty: "25 g feta, 30 g aguacate", desc: ""},
+        almuerzo: {nombre: "Bife con ensalada y feta", qty: "160 g res, 40 g hojas verdes, 20 g feta", desc: ""},
+        snackPM: {nombre: "Marañones", qty: "20 g", desc: ""},
+        cena: {nombre: "Pollo al horno con brócoli gratinado", qty: "150 g pollo, 100 g brócoli, 20 g queso", desc: ""}
+      },
+      {
+        dia: "Día 7",
+        kcal: 1580,
+        macros: {carbs: "7%", prot: "24%", fat: "69%"},
+        desayuno: {nombre: "Huevos revueltos con mantequilla y aguacate", qty: "2 huevos, 1/2 aguacate, 5 g mantequilla", desc: ""},
+        snackAM: {nombre: "Yogur + chía", qty: "120 g yogur, 5 g chía", desc: ""},
+        almuerzo: {nombre: "Ensalada de salmón con rocket y feta", qty: "140 g salmón, 40 g rocket, 20 g feta", desc: ""},
+        snackPM: {nombre: "Feta con tomate", qty: "30 g feta, 4 tomates", desc: ""},
+        cena: {nombre: "Filete de res con brócoli", qty: "160 g res, 100 g brócoli, 5 g mantequilla", desc: ""}
+      },
+      {
+        dia: "Día 8",
+        kcal: 1600,
+        macros: {carbs: "7%", prot: "25%", fat: "68%"},
+        desayuno: {nombre: "Omelette 3 huevos con feta y rocket", qty: "3 huevos, 30 g feta, 30 g rocket", desc: ""},
+        snackAM: {nombre: "Yogur con marañones", qty: "120 g yogur, 20 g marañones", desc: ""},
+        almuerzo: {nombre: "Pollo salteado con brócoli", qty: "150 g pollo, 100 g brócoli, 5 ml aceite", desc: ""},
+        snackPM: {nombre: "Feta y aguacate", qty: "25 g feta, 30 g aguacate", desc: ""},
+        cena: {nombre: "Salmón con mantequilla de ajo", qty: "150 g salmón, 5 g mantequilla", desc: ""}
+      },
+      {
+        dia: "Día 9",
+        kcal: 1590,
+        macros: {carbs: "7%", prot: "25%", fat: "68%"},
+        desayuno: {nombre: "Yogur con nueces y coco", qty: "150 g yogur, 10 g coco, 15 g nueces", desc: ""},
+        snackAM: {nombre: "Feta y tomate", qty: "25 g feta, 4 tomates", desc: ""},
+        almuerzo: {nombre: "Bife de res con rocket y aguacate", qty: "160 g res, 40 g rocket, 1/2 aguacate", desc: ""},
+        snackPM: {nombre: "Marañones o almendras", qty: "20 g", desc: ""},
+        cena: {nombre: "Camarones con crema y brócoli", qty: "140 g camarón, 100 g brócoli, 20 ml crema", desc: ""}
+      },
+      {
+        dia: "Día 10",
+        kcal: 1600,
+        macros: {carbs: "8%", prot: "24%", fat: "68%"},
+        desayuno: {nombre: "Huevos fritos con aguacate", qty: "2 huevos, 1/2 aguacate", desc: ""},
+        snackAM: {nombre: "Yogur con chía", qty: "120 g yogur, 5 g chía", desc: ""},
+        almuerzo: {nombre: "Pollo al curry sin arroz con coliflor", qty: "150 g pollo, 100 g coliflor", desc: ""},
+        snackPM: {nombre: "Feta con rocket", qty: "25 g feta, 20 g rocket", desc: ""},
+        cena: {nombre: "Salmón con tomate y feta", qty: "150 g salmón, 40 g tomate, 20 g feta", desc: ""}
+      },
+      {
+        dia: "Día 11",
+        kcal: 1590,
+        macros: {carbs: "7%", prot: "25%", fat: "68%"},
+        desayuno: {nombre: "Omelette con champiñones y feta", qty: "2-3 huevos, 50 g champiñón, 20 g feta", desc: ""},
+        snackAM: {nombre: "Marañones", qty: "20 g", desc: ""},
+        almuerzo: {nombre: "Ensalada de pollo y aguacate", qty: "140 g pollo, 1/2 aguacate, 40 g rocket", desc: ""},
+        snackPM: {nombre: "Yogur con coco", qty: "120 g yogur, 10 g coco", desc: ""},
+        cena: {nombre: "Carne roja con puré de coliflor", qty: "160 g carne, 120 g coliflor", desc: ""}
+      },
+      {
+        dia: "Día 12",
+        kcal: 1580,
+        macros: {carbs: "7%", prot: "24%", fat: "69%"},
+        desayuno: {nombre: "Yogur con nueces", qty: "150 g yogur, 15 g nueces", desc: ""},
+        snackAM: {nombre: "Feta y aguacate", qty: "25 g feta, 30 g aguacate", desc: ""},
+        almuerzo: {nombre: "Camarones al ajillo con ensalada", qty: "140 g camarón, 50 g hojas verdes, 5 ml aceite", desc: ""},
+        snackPM: {nombre: "Café con crema + marañones", qty: "10 ml crema, 15 g marañones", desc: ""},
+        cena: {nombre: "Pollo al horno con brócoli y feta", qty: "150 g pollo, 100 g brócoli, 20 g feta", desc: ""}
+      },
+      {
+        dia: "Día 13",
+        kcal: 1600,
+        macros: {carbs: "7%", prot: "24%", fat: "69%"},
+        desayuno: {nombre: "Huevos cocidos con aguacate", qty: "2 huevos, 1/2 aguacate", desc: ""},
+        snackAM: {nombre: "Yogur con coco", qty: "120 g yogur, 10 g coco", desc: ""},
+        almuerzo: {nombre: "Bife con tomate y rocket", qty: "160 g res, 40 g rocket, 40 g tomate", desc: ""},
+        snackPM: {nombre: "Feta con nueces", qty: "25 g feta, 10 g nueces", desc: ""},
+        cena: {nombre: "Salmón con mantequilla y brócoli", qty: "150 g salmón, 100 g brócoli, 5 g mantequilla", desc: ""}
+      },
+      {
+        dia: "Día 14",
+        kcal: 1600,
+        macros: {carbs: "7%", prot: "24%", fat: "69%"},
+        desayuno: {nombre: "Omelette feta y rocket", qty: "2-3 huevos, 30 g feta, 30 g rocket", desc: ""},
+        snackAM: {nombre: "Yogur con chía", qty: "120 g yogur, 5 g chía", desc: ""},
+        almuerzo: {nombre: "Pollo con aguacate y tomate", qty: "140 g pollo, 1/2 aguacate, 40 g tomate", desc: ""},
+        snackPM: {nombre: "Marañones o feta", qty: "20 g marañones o 25 g feta", desc: ""},
+        cena: {nombre: "Filete de res con brócoli y mantequilla", qty: "160 g res, 100 g brócoli, 5 g mantequilla", desc: ""}
+      }
+    ];
+
+    const tips = [
+      "🥤 Tomen agua con un poco de sal. Ayuda mucho en keto.",
+      "🥑 Si tienen hambre suban grasa. No suban carbos.",
+      "🍳 Dos huevos extra al desayuno están bien.",
+      "📸 Foto día 1 y foto día 14.",
+      "🧴 Pueden cambiar mantequilla por aceite de oliva."
+    ];
+
+    function setRandomTip() {
+      const tipBox = document.getElementById("tipBox");
+      tipBox.textContent = tips[Math.floor(Math.random() * tips.length)];
+    }
+
+    function renderDayPills(week) {
+      const wrap = document.getElementById("dayFloating");
+      wrap.innerHTML = "";
+      const start = week === 1 ? 0 : 7;
+      const end = week === 1 ? 7 : 14;
+      for (let i = start; i < end; i++) {
+        const pill = document.createElement("div");
+        pill.className = "day-pill" + (i === start ? " active" : "");
+        pill.textContent = plan[i].dia;
+        pill.onclick = () => renderMenuDay(i, week);
+        wrap.appendChild(pill);
+      }
+    }
+
+    function renderMenuDay(idx, week) {
+      const menuDays = document.getElementById("menuDays");
+      menuDays.innerHTML = "";
+      const day = plan[idx];
+      const card = document.createElement("div");
+      card.className = "day-card";
+      card.innerHTML = `
+        <div class="day-title">
+          <h2>${day.dia}</h2>
+          <div class="kcal">${day.kcal} kcal aprox</div>
+        </div>
+        <div class="macros">
+          <div class="macro"><small>Carbs</small><span>${day.macros.carbs}</span></div>
+          <div class="macro"><small>Prote</small><span>${day.macros.prot}</span></div>
+          <div class="macro"><small>Grasa</small><span>${day.macros.fat}</span></div>
+        </div>
+        <div class="progress-bar"><span></span></div>
+        <div class="food-grid">
+          <div class="meal">
+            <div class="meal-title">
+              <span>🍳 Desayuno</span>
+              <span class="meal-qty">${day.desayuno.qty}</span>
+            </div>
+            <div class="meal-desc">${day.desayuno.nombre}</div>
+            <div class="meal-desc" style="opacity:.5">${day.desayuno.desc || ""}</div>
+          </div>
+          <div class="meal">
+            <div class="meal-title">
+              <span>⏰ Snack AM</span>
+              <span class="meal-qty">${day.snackAM.qty}</span>
+            </div>
+            <div class="meal-desc">${day.snackAM.nombre}</div>
+          </div>
+          <div class="meal">
+            <div class="meal-title">
+              <span>🥗 Almuerzo</span>
+              <span class="meal-qty">${day.almuerzo.qty}</span>
+            </div>
+            <div class="meal-desc">${day.almuerzo.nombre}</div>
+            <div class="meal-desc" style="opacity:.5">${day.almuerzo.desc || ""}</div>
+          </div>
+          <div class="meal">
+            <div class="meal-title">
+              <span>🥜 Snack PM</span>
+              <span class="meal-qty">${day.snackPM.qty}</span>
+            </div>
+            <div class="meal-desc">${day.snackPM.nombre}</div>
+          </div>
+          <div class="meal">
+            <div class="meal-title">
+              <span>🍖 Cena</span>
+              <span class="meal-qty">${day.cena.qty}</span>
+            </div>
+            <div class="meal-desc">${day.cena.nombre}</div>
+            <div class="meal-desc" style="opacity:.5">${day.cena.desc || ""}</div>
+          </div>
+        </div>
+      `;
+      menuDays.appendChild(card);
+      animateCards();
+
+      document.querySelectorAll(".day-pill").forEach((p, i) => {
+        const base = week === 1 ? 0 : 7;
+        p.classList.toggle("active", (i + base) === idx);
+      });
+    }
+
+    function renderCompras() {
+      const compras = [
+        {cat:"Proteínas",items:"Huevos, Pollo, Salmón, Camarones, Carne de res, Yogur griego"},
+        {cat:"Verduras",items:"Brócoli, Coliflor, Tomate cherry, Rocket, Aguacate, Champiñón"},
+        {cat:"Grasas buenas",items:"Mantequilla, Aceite de oliva, Crema, Queso feta"},
+        {cat:"Snacks",items:"Marañones, Nueces, Chía, Coco rallado"},
+        {cat:"Otros",items:"Café sin azúcar, Sal rosada, Limón"}
+      ];
+      const container = document.getElementById("compras");
+      container.innerHTML = "";
+      const note = document.createElement("div");
+      note.className = "list-row";
+      note.textContent = "Compren por semana para que todo esté fresco.";
+      container.appendChild(note);
+      compras.forEach(c => {
+        const row = document.createElement("div");
+        row.className = "list-row";
+        row.innerHTML = `<strong>${c.cat}</strong><div class="small">${c.items}</div>`;
+        container.appendChild(row);
+      });
+      animateCards();
+    }
+
+    function renderProgreso() {
+      const container = document.getElementById("progreso");
+      container.innerHTML = "";
+      const canvas = document.createElement("canvas");
+      canvas.id = "weightChart";
+      canvas.style.maxWidth = "100%";
+      container.appendChild(canvas);
+
+      const note = document.createElement("div");
+      note.className = "list-row";
+      note.textContent = "Registra peso y energía. Se guarda aquí.";
+      container.appendChild(note);
+
+      plan.forEach((d, idx) => {
+        const saved = JSON.parse(localStorage.getItem("progreso-keto-" + idx) || "{}");
+        const row = document.createElement("div");
+        row.className = "day-card";
+        row.innerHTML = `
+          <div class="day-title"><h2>${d.dia}</h2><span class="kcal">${d.kcal} kcal</span></div>
+          <input type="number" placeholder="Peso (kg)" value="${saved.peso || ""}" id="peso-${idx}">
+          <input type="number" placeholder="Cintura (cm)" value="${saved.cintura || ""}" id="cintura-${idx}">
+          <input type="number" placeholder="Energía (1-10)" value="${saved.energia || ""}" id="energia-${idx}">
+          <textarea placeholder="Notas" id="nota-${idx}">${saved.notas || ""}</textarea>
+          <button class="save-btn" onclick="saveProgreso(${idx})">Guardar</button>
+        `;
+        container.appendChild(row);
+      });
+      animateCards();
+      drawChart();
+    }
+
+    function saveProgreso(idx) {
+      const data = {
+        peso: document.getElementById("peso-" + idx).value,
+        cintura: document.getElementById("cintura-" + idx).value,
+        energia: document.getElementById("energia-" + idx).value,
+        notas: document.getElementById("nota-" + idx).value
+      };
+      localStorage.setItem("progreso-keto-" + idx, JSON.stringify(data));
+      alert("✅ Guardado");
+      drawChart();
+    }
+    window.saveProgreso = saveProgreso;
+
+    function switchTab(target) {
+      ["menu","compras","progreso"].forEach(id => {
+        document.getElementById(id).style.display = id === target ? "block" : "none";
+      });
+      document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === target));
+      document.querySelectorAll(".bottom-btn").forEach(t => t.classList.toggle("active", t.dataset.tab === target));
+      if (target === "menu") {
+        renderDayPills(1);
+        renderMenuDay(0,1);
+      }
+      if (target === "compras") renderCompras();
+      if (target === "progreso") renderProgreso();
+    }
+
+    document.querySelectorAll(".tab").forEach(tab => {
+      tab.addEventListener("click", () => switchTab(tab.dataset.tab));
+    });
+    document.querySelectorAll(".bottom-btn").forEach(btn => {
+      btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+    });
+
+    document.addEventListener("click", e => {
+      if (e.target.classList.contains("week-btn")) {
+        document.querySelectorAll(".week-btn").forEach(b => b.classList.remove("active"));
+        e.target.classList.add("active");
+        const week = Number(e.target.dataset.week);
+        renderDayPills(week);
+        const idx = week === 1 ? 0 : 7;
+        renderMenuDay(idx, week);
+      }
+    });
+
+    const themeToggle = document.getElementById("themeToggle");
+    const savedTheme = localStorage.getItem("keto-theme-v2") || "dark";
+    document.body.setAttribute("data-theme", savedTheme);
+    themeToggle.checked = savedTheme !== "light";
+    themeToggle.addEventListener("change", () => {
+      const mode = themeToggle.checked ? "dark" : "light";
+      document.body.setAttribute("data-theme", mode);
+      localStorage.setItem("keto-theme-v2", mode);
+    });
+
+    function animateCards() {
+      const items = document.querySelectorAll(".day-card, .list-row");
+      if ("IntersectionObserver" in window) {
+        const observer = new IntersectionObserver(entries => {
+          entries.forEach(e => {
+            if (e.isIntersecting) e.target.classList.add("show");
+          });
+        }, {threshold: .15});
+        items.forEach(i => observer.observe(i));
+      } else {
+        items.forEach(i => i.classList.add("show"));
+      }
+    }
+
+    let weightChart;
+    function drawChart() {
+      const ctx = document.getElementById("weightChart");
+      if (!ctx || typeof Chart === "undefined") return;
+      const weights = plan.map((_, idx) => {
+        const saved = JSON.parse(localStorage.getItem("progreso-keto-" + idx) || "{}");
+        return saved.peso ? parseFloat(saved.peso) : null;
+      });
+      if (weightChart) weightChart.destroy();
+      weightChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: plan.map(p => p.dia),
+          datasets: [{
+            label: 'Peso (kg)',
+            data: weights,
+            borderWidth: 2,
+            tension: .35
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: false } }
+        }
+      });
+      ctx.parentElement.style.height = "180px";
+    }
+
+    setRandomTip();
+    renderDayPills(1);
+    renderMenuDay(0,1);
+  </script>
+</body>
+</html>
