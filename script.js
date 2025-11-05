@@ -355,29 +355,29 @@ async function generateDinnerAI(idx) {
       : `Crea 1 cena keto (corta) de unas 500-650 kcal. Evita: ${dislike}. Prefiere: ${like}. Responde SOLO con: Título, Ingredientes, Preparación.`;
 
   try {
-    const res = await fetch(GROK_PROXY, {
+    const res = await fetch("/.netlify/functions/grok", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt })
     });
 
-    const payload = await res.json();
+    const data = await res.json();
 
-    if (!res.ok) {
-      showToast(lang === "en" ? "AI did not respond" : "IA no respondió");
+    if (!data.ok) {
+      console.warn("Grok error:", data);
+      showToast(data.error || (lang === "en" ? "AI did not respond" : "IA no respondió"));
       return;
     }
 
-    const aiText = extractGrokText(payload);
-
+    const aiText = (data.text || "").trim();
     if (!aiText) {
-      showToast(lang === "en" ? "AI did not return text" : "La IA no devolvió texto");
+      showToast(lang === "en" ? "AI returned empty text" : "La IA devolvió texto vacío");
       return;
     }
 
     const cenaText = document.querySelector("#menuDays #cena-text");
     if (cenaText) {
-      cenaText.textContent = aiText.trim();
+      cenaText.textContent = aiText;
     }
     showToast(lang === "en" ? "AI dinner updated" : "Cena IA actualizada");
   } catch (e) {
