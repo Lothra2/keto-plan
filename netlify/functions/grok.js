@@ -1,44 +1,90 @@
 // netlify/functions/grok.js
+
 const API_URL = "https://api.x.ai/v1/chat/completions";
 
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: JSON.stringify({ ok: false, error: "Method not allowed" }) };
+    return {
+      statusCode: 405,
+      body: JSON.stringify({ ok: false, error: "Method not allowed" })
+    };
   }
 
   try {
     const body = JSON.parse(event.body || "{}");
-    const userPrompt = body.prompt || "Say hello from Grok-4-latest";
-    const apiKey = process.env.XAI_API_KEY;
+    const userPrompt =
+      body.prompt ||
+      "Create 1 short keto dinner (title, ingredients, instructions) in Spanish.";
 
-    const response = await fetch(API_URL, {
+    const apiKey = process.env.XAI_API_KEY;
+    if (!apiKey) {
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          ok: false,
+          error: "XAI_API_KEY no está configurada en Netlify."
+        })
+      };
+    }
+
+    // 👇 esto es tal cual lo que te mostró xAI en su panel
+    const xaiRes = await fetch(API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "grok-4-latest", // confirmado en tu screenshot
         messages: [
-          { role: "system", content: "You are a helpful assistant that gives short, clear answers." },
-          { role: "user", content: userPrompt }
+          {
+            role: "system",
+            content: "You are a test assistant."
+          },
+          {
+            role: "user",
+            content: userPrompt
+          }
         ],
+        model: "grok-4-latest",
         stream: false,
-        temperature: 0.4
+        temperature: 0
       })
     });
 
-    const data = await response.json();
-    const text = data.choices?.[0]?.message?.content || "Sin respuesta de Grok.";
+    const data = await xaiRes.json();
+
+    // si xAI devolvió error (401, 403, etc.)
+    if (!xaiRes.ok) {
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          ok: false,
+          error: data.error || "Error desde xAI",
+          raw: data
+        })
+      };
+    }
+
+    // formato tipo OpenAI
+    const text =
+      data?.choices?.[0]?.message?.content?.trim() ||
+      "Grok no devolvió contenido.";
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ ok: true, text })
+      body: JSON.stringify({
+        ok: true,
+        text,
+        raw: data
+      })
     };
-  } catch (error) {
+  } catch (err) {
     return {
-      statusCode: 500,
-      body: JSON.stringify({ ok: false, error: error.message })
+      statusCode: 200,
+      body: JSON.stringify({
+        ok: false,
+        error: err.message
+      })
     };
   }
 };
