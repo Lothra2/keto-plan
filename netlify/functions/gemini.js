@@ -29,7 +29,7 @@ exports.handler = async (event, context) => {
       "Crea una cena keto sencilla de 500-650 kcal. Dame: Título, Ingredientes y Preparación. Responde en español.";
 
     const resp = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" +
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" +
         apiKey,
       {
         method: "POST",
