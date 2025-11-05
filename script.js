@@ -12,8 +12,7 @@ const LS_LANG = LS_PREFIX + "lang";
 const LS_LIKE = LS_PREFIX + "like-foods";
 const LS_DISLIKE = LS_PREFIX + "dislike-foods";
 
-// 👇 ahora el front NO tiene la key
-// en vez de eso, llamamos al proxy de Netlify
+// 👇 ahora usamos el proxy de Netlify, no la key en el front
 const GEMINI_PROXY = "/.netlify/functions/gemini";
 
 let weightChart = null;
@@ -318,14 +317,15 @@ function swapCena(idx, week) {
 }
 window.swapCena = swapCena;
 
-// ====== IA: GENERAR CENA (via Netlify) ======
+// ====== IA: GENERAR CENA ======
 async function generateDinnerAI(idx) {
   const like = localStorage.getItem(LS_LIKE) || "";
   const dislike = localStorage.getItem(LS_DISLIKE) || "";
   const lang = appLang;
-  const prompt = lang === "en"
-    ? `Create 1 keto dinner (short) around 500-650 kcal. Avoid: ${dislike}. Prefer: ${like}. Respond ONLY with: Title, Ingredients, Instructions.`
-    : `Crea 1 cena keto (corta) de unas 500-650 kcal. Evita: ${dislike}. Prefiere: ${like}. Responde SOLO con: Título, Ingredientes, Preparación.`;
+  const prompt =
+    lang === "en"
+      ? `Create 1 keto dinner (short) around 500-650 kcal. Avoid: ${dislike}. Prefer: ${like}. Respond ONLY with: Title, Ingredients, Instructions.`
+      : `Crea 1 cena keto (corta) de unas 500-650 kcal. Evita: ${dislike}. Prefiere: ${like}. Responde SOLO con: Título, Ingredientes, Preparación.`;
 
   try {
     const res = await fetch(GEMINI_PROXY, {
@@ -333,12 +333,19 @@ async function generateDinnerAI(idx) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt })
     });
+
     const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    const text =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      data?.error?.message ||
+      "";
+
     if (!text) {
-      showToast(lang === "en" ? "No response from AI" : "IA no respondió");
+      showToast(lang === "en" ? "AI did not respond" : "IA no respondió");
       return;
     }
+
     const cenaText = document.querySelector("#menuDays #cena-text");
     if (cenaText) {
       cenaText.textContent = text;
