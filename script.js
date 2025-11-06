@@ -14,6 +14,7 @@ const LS_DISLIKE = LS_PREFIX + "dislike-foods";
 const LS_API_USER = LS_PREFIX + "api-user";
 const LS_API_PASS = LS_PREFIX + "api-pass";
 const LS_AI_DAY_PREFIX = LS_PREFIX + "ai-day-";
+const LS_AI_WORKOUT = LS_PREFIX + "ai-workout-"; // 👈 nuevo: guardar entreno IA por día
 const LS_CAL_PREFIX = LS_PREFIX + "cal-";
 const LS_PROGRESS_PREFIX = LS_PREFIX + "prog-";
 const LS_SELECTED_DAY = LS_PREFIX + "sel-day";
@@ -433,10 +434,20 @@ function renderMenuDay(idx, week) {
         ${appLang === "en" ? "Full day AI 📅" : "Día completo IA 📅"}
       </button>
     </div>
-
-
   `;
   menuDays.appendChild(card);
+
+  // 👇 si hay un entreno IA guardado para este día, lo mostramos
+  const savedWorkout = localStorage.getItem(LS_AI_WORKOUT + idx);
+  if (savedWorkout) {
+    try {
+      const parsed = JSON.parse(savedWorkout);
+      renderWorkoutCardsFromArray(idx, parsed, appLang);
+    } catch (e) {
+      // si está roto, no hacemos nada
+    }
+  }
+
   animateCards();
   document.querySelectorAll(".day-pill").forEach((p, i) => {
     const base = (week - 1) * 7;
@@ -656,15 +667,13 @@ async function generateFullDayAI(idx, week) {
 window.generateFullDayAI = generateFullDayAI;
 
 // ====== IA: WORKOUT DEL DÍA (FORMATO LIMPIO) ======
-// Este helper trata de sacar SOLO el JSON aunque la IA hable mucho
+// helper para sacar el JSON real
 function extractJSONSnippet(raw) {
   if (!raw) return null;
-  // buscar ```json ... ```
   const fence = raw.match(/```(?:json)?([\s\S]*?)```/i);
   if (fence && fence[1]) {
     return fence[1].trim();
   }
-  // si no, busca el primer { y el último }
   const first = raw.indexOf("{");
   const last = raw.lastIndexOf("}");
   if (first !== -1 && last !== -1 && last > first) {
@@ -688,12 +697,10 @@ function normalizeWorkoutArray(arr, lang) {
 }
 
 function parseWorkoutTextToClean(raw, lang) {
-  // fallback por si la IA no devuelve JSON
   const lines = (raw || "")
     .split("\n")
     .map(l => l.trim())
     .filter(Boolean)
-    // quitar líneas intro tipo "Aquí tienes el JSON..."
     .filter(l => !/aquí tienes|here is/i.test(l))
     .filter(l => !/^```/.test(l));
 
@@ -702,6 +709,35 @@ function parseWorkoutTextToClean(raw, lang) {
     series: lang === "en" ? "3 sets" : "3 series",
     descripcion: ""
   })).slice(0, 6);
+}
+
+// 👇 función reutilizable para pintar desde un array (también sirve para lo guardado)
+function renderWorkoutCardsFromArray(idx, workouts, lang) {
+  const box = document.getElementById("ai-workout-list-" + idx);
+  if (!box) return;
+  if (!Array.isArray(workouts) || workouts.length === 0) {
+    box.style.display = "none";
+    return;
+  }
+  box.innerHTML =
+    `<p class="small"><strong>${lang === "en" ? "AI workout" : "Entreno IA"}:</strong></p>` +
+    `<div class="ai-workout-grid">` +
+    workouts
+      .map(w => {
+        const n = w.nombre || "";
+        const s = w.series || "";
+        const d = w.descripcion || "";
+        return `
+          <div class="ai-workout-item">
+            <div class="ai-w-name">${n}</div>
+            <div class="ai-w-series">${s}</div>
+            <div class="ai-w-desc">${d}</div>
+          </div>
+        `;
+      })
+      .join("") +
+    `</div>`;
+  box.style.display = "block";
 }
 
 async function generateWorkoutAI(idx, week) {
@@ -724,55 +760,33 @@ async function generateWorkoutAI(idx, week) {
       showToast(data.error || (lang === "en" ? "AI did not respond" : "IA no respondió"));
       return;
     }
-    const box = document.getElementById("ai-workout-list-" + idx);
-    if (box) {
-      let workouts = [];
 
-      // 1) la IA mandó ya estructurado
-      if (data.structured && Array.isArray(data.structured.ejercicios)) {
-        workouts = normalizeWorkoutArray(data.structured.ejercicios, lang);
-      } else {
-        const rawText = data.text || "";
+    let workouts = [];
 
-        // 2) intentar sacar el bloque JSON de un texto largo
-        const snippet = extractJSONSnippet(rawText);
-        if (snippet) {
-          try {
-            const parsed = JSON.parse(snippet);
-            if (parsed && Array.isArray(parsed.ejercicios)) {
-              workouts = normalizeWorkoutArray(parsed.ejercicios, lang);
-            }
-          } catch(e) {
-            // si falla seguimos al fallback
+    if (data.structured && Array.isArray(data.structured.ejercicios)) {
+      workouts = normalizeWorkoutArray(data.structured.ejercicios, lang);
+    } else {
+      const rawText = data.text || "";
+      const snippet = extractJSONSnippet(rawText);
+      if (snippet) {
+        try {
+          const parsed = JSON.parse(snippet);
+          if (parsed && Array.isArray(parsed.ejercicios)) {
+            workouts = normalizeWorkoutArray(parsed.ejercicios, lang);
           }
-        }
-
-        // 3) último recurso: convertir líneas en ejercicios
-        if (!workouts.length) {
-          workouts = parseWorkoutTextToClean(rawText, lang);
-        }
+        } catch(e) {}
       }
-
-      box.innerHTML =
-        `<p class="small"><strong>${lang === "en" ? "AI workout" : "Entreno IA"}:</strong></p>` +
-        `<div class="ai-workout-grid">` +
-        workouts
-          .map(w => {
-            const n = w.nombre || "";
-            const s = w.series || "";
-            const d = w.descripcion || "";
-            return `
-              <div class="ai-workout-item">
-                <div class="ai-w-name">${n}</div>
-                <div class="ai-w-series">${s}</div>
-                <div class="ai-w-desc">${d}</div>
-              </div>
-            `;
-          })
-          .join("") +
-        `</div>`;
-      box.style.display = "block";
+      if (!workouts.length) {
+        workouts = parseWorkoutTextToClean(rawText, lang);
+      }
     }
+
+    // 👇 guardar en localStorage para no perderlo
+    localStorage.setItem(LS_AI_WORKOUT + idx, JSON.stringify(workouts));
+
+    // y pintar
+    renderWorkoutCardsFromArray(idx, workouts, lang);
+
     showToast(lang === "en" ? "Workout generated" : "Entreno generado");
   } catch (e) {
     console.error(e);
@@ -1048,7 +1062,6 @@ function switchTab(target) {
   hideToast();
 
   if (target === "menu") {
-    // preferir lo último que vio el usuario
     let idx = Number(localStorage.getItem(LS_SELECTED_DAY));
     let week = Number(localStorage.getItem(LS_SELECTED_WEEK));
     if (isNaN(idx) || idx < 0 || idx >= derivedPlan.length) {
@@ -1418,7 +1431,6 @@ function drawExerciseChart() {
   askStartDateIfNeeded();
   renderWeekButtons();
 
-  // preferimos lo último que vio; si no hay, usamos índice por fecha
   let idx = Number(localStorage.getItem(LS_SELECTED_DAY));
   let week = Number(localStorage.getItem(LS_SELECTED_WEEK));
   if (isNaN(idx) || idx < 0 || idx >= derivedPlan.length) {
