@@ -710,17 +710,18 @@ async function generateMealAI(idx, mealKey, week) {
       renderAiDay('', idx, `aiDayOutput-${idx}`); // Prepara el contenedor si está vacío
   }
 
-  // --- CORRECCIÓN FINAL ---
-  // El backend SIEMPRE espera un campo "prompt", además de los otros datos.
-  // Creamos un prompt descriptivo y lo incluimos en el payload estructurado.
+  // --- CORRECCIÓN DEFINITIVA ---
+  // Usamos el formato de prompt del script anterior que sí funcionaba.
+  // Este prompt es muy específico sobre el formato de la respuesta, lo cual es crucial.
   const prompt =
     lang === "en"
-      ? `Generate a single keto ${mealNameEN} meal. User likes: ${like}. User dislikes: ${dislike}.`
-      : `Genera una única comida keto de tipo ${mealNameES}. Al usuario le gusta: ${like}. Al usuario no le gusta: ${dislike}.`;
+      ? `Create 1 short keto ${mealNameEN} (~350-600 kcal). Prefer: ${like}. Avoid: ${dislike}. Respond ONLY with one line like "Scrambled eggs with feta and avocado (2 eggs, 30 g feta, 1/2 avocado)".`
+      : `Genera 1 ${mealNameES} keto corto (~350-600 kcal). Prefiere: ${like}. Evita: ${dislike}. Responde SOLO con una línea así: "Huevos revueltos con feta y aguacate (2 huevos, 30 g feta, 1/2 aguacate)".`;
 
+  // El payload debe incluir el 'prompt' que el backend espera, junto con los otros datos.
   const payload = {
     mode: mealKey, // 'desayuno', 'almuerzo', 'cena'
-    prompt, // El campo que faltaba y causaba el error "prompt required"
+    prompt,
     lang,
     user: apiUser,
     pass: apiPass,
@@ -732,7 +733,7 @@ async function generateMealAI(idx, mealKey, week) {
     const res = await fetch(GROK_PROXY, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload) // Enviamos el payload corregido
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
     if (!data.ok) {
