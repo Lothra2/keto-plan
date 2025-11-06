@@ -429,13 +429,11 @@ function renderMenuDay(idx, week) {
       <button class="done-btn ${done ? "done" : ""}" onclick="toggleDone(${idx}, ${week})">
         ${done ? (appLang === "en" ? "✔ Day completed" : "✔ Día completado") : (appLang === "en" ? "Mark day ✔" : "Marcar día ✔")}
       </button>
-      <button class="swap-btn" onclick="swapCena(${idx}, ${week})">
-        ${appLang === "en" ? "Change dinner 🔁" : "Cambiar cena 🔁"}
-      </button>
       <button class="ia-btn" onclick="generateFullDayAI(${idx}, ${week})">
         ${appLang === "en" ? "Full day AI 📅" : "Día completo IA 📅"}
       </button>
     </div>
+
 
   `;
   menuDays.appendChild(card);
