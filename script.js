@@ -426,11 +426,17 @@ function renderMenuDay(idx, week) {
       <div class="ai-workout-list" id="ai-workout-list-${idx}" style="display:none"></div>
     </div>
     <div class="day-actions">
-      <button class="done-btn ${done ? "done" : ""}" onclick="toggleDone(${idx}, ${week})">${done ? (appLang === "en" ? "✔ Day completed" : "✔ Día completado") : (appLang === "en" ? "Mark day ✔" : "Marcar día ✔")}</button>
-      <button class="swap-btn" onclick="swapCena(${idx}, ${week})">${appLang === "en" ? "Change dinner 🔁" : "Cambiar cena 🔁"}</button>
-      <button class="ia-btn" onclick="generateDinnerAI(${idx})">${appLang === "en" ? "Dinner AI 🤖" : "Cena IA 🤖"}</button>
-      <button class="ia-btn" onclick="generateFullDayAI(${idx}, ${week})">${appLang === "en" ? "Full day AI 📅" : "Día completo IA 📅"}</button>
+      <button class="done-btn ${done ? "done" : ""}" onclick="toggleDone(${idx}, ${week})">
+        ${done ? (appLang === "en" ? "✔ Day completed" : "✔ Día completado") : (appLang === "en" ? "Mark day ✔" : "Marcar día ✔")}
+      </button>
+      <button class="swap-btn" onclick="swapCena(${idx}, ${week})">
+        ${appLang === "en" ? "Change dinner 🔁" : "Cambiar cena 🔁"}
+      </button>
+      <button class="ia-btn" onclick="generateFullDayAI(${idx}, ${week})">
+        ${appLang === "en" ? "Full day AI 📅" : "Día completo IA 📅"}
+      </button>
     </div>
+
   `;
   menuDays.appendChild(card);
   animateCards();
@@ -443,7 +449,10 @@ function renderMenuDay(idx, week) {
 function buildMealBlock(idx, week, key, title, mealObj, done, isDinner = false) {
   const qty = mealObj && mealObj.qty ? mealObj.qty : "";
   const name = mealObj && mealObj.nombre ? mealObj.nombre : "";
-  const canIA = (key === "desayuno" || key === "almuerzo");
+
+  // ahora también la cena puede tener IA
+  const canIA = (key === "desayuno" || key === "almuerzo" || key === "cena");
+
   return `
     <div class="meal ${done ? "meal-done" : ""}" ${isDinner ? 'id="cena-block"' : ""}>
       <div class="meal-title-row">
