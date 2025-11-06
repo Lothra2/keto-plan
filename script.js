@@ -299,13 +299,11 @@ function getCalorieState(idx, day) {
   const baseGoal = day.kcal || 1600;
   if (stored) {
     const parsed = JSON.parse(stored);
-    // aseguramos que tenga goal
     parsed.goal = parsed.goal || baseGoal;
     return parsed;
   }
   return {
     goal: baseGoal,
-    // estimación: desayuno 25%, snackAM 10%, almuerzo 35%, snackPM 10%, cena 20%
     meals: {
       desayuno: false,
       snackAM: false,
@@ -476,6 +474,22 @@ function swapCena(idx, week) {
 }
 window.swapCena = swapCena;
 
+// pequeñas utilidades para IA
+function cleanAiDinnerText(raw) {
+  if (!raw) return "";
+  let text = raw.trim();
+  // quitar markdown básico
+  text = text.replace(/\*\*/g, "");
+  text = text.replace(/^\s*Titulo:\s*/i, "");
+  text = text.replace(/^\s*Título:\s*/i, "");
+  // si viene muy largo, nos quedamos con la primera línea
+  if (text.length > 180) {
+    const firstLine = text.split("\n").find(l => l.trim().length > 0) || text;
+    text = firstLine.trim();
+  }
+  return text;
+}
+
 // ====== IA: DINNER ======
 async function generateDinnerAI(idx) {
   const like = localStorage.getItem(LS_LIKE) || "";
@@ -484,10 +498,11 @@ async function generateDinnerAI(idx) {
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
 
+  // prompt ahora ultra corto
   const prompt =
     lang === "en"
-      ? `Create 1 keto dinner (short) around 500-650 kcal. Avoid: ${dislike}. Prefer: ${like}. Respond ONLY with: Title, Ingredients, Instructions.`
-      : `Crea 1 cena keto (corta) de unas 500-650 kcal. Evita: ${dislike}. Prefiere: ${like}. Responde SOLO con: Título, Ingredientes, Preparación.`;
+      ? `Make 1 short keto dinner (500-650 kcal). Prefer: ${like}. Avoid: ${dislike}. Respond ONLY with one simple line like "Chicken with broccoli in butter (150 g chicken, 120 g broccoli)". No title, no ingredients section, no preparation.`
+      : `Genera 1 cena keto corta (500-650 kcal). Prefiere: ${like}. Evita: ${dislike}. Responde SOLO con una sola línea así: "Pollo con brócoli en mantequilla (150 g pollo, 120 g brócoli)". Sin títulos, sin secciones, sin preparación.`;
 
   try {
     const res = await fetch(GROK_PROXY, {
@@ -504,16 +519,25 @@ async function generateDinnerAI(idx) {
       return;
     }
 
-    const aiText = (data.text || "").trim();
+    let aiText = (data.text || "").trim();
+    aiText = cleanAiDinnerText(aiText);
+
     if (!aiText) {
       showToast(lang === "en" ? "AI returned empty text" : "La IA devolvió texto vacío");
       return;
     }
 
+    // actualizamos cuerpo
     const cenaText = document.querySelector("#menuDays #cena-text");
     if (cenaText) {
       cenaText.textContent = aiText;
     }
+    // actualizamos cabecera (qty) para que no se quede con la vieja
+    const cenaQty = document.querySelector("#menuDays #cena-qty");
+    if (cenaQty) {
+      cenaQty.textContent = lang === "en" ? "AI dinner" : "Cena IA";
+    }
+
     showToast(lang === "en" ? "AI dinner updated" : "Cena IA actualizada");
   } catch (e) {
     console.error(e);
@@ -555,20 +579,16 @@ async function generateFullDayAI(idx, week) {
       return;
     }
 
-    // intentamos parsear contenido estructurado
     let structured = null;
     if (data.structured) {
       structured = data.structured;
     } else if (data.text) {
       try {
         structured = JSON.parse(data.text);
-      } catch(e) {
-        // si no vino JSON, lo guardamos como cena de IA para no perderlo
-      }
+      } catch(e) {}
     }
 
     if (structured && structured.desayuno && structured.almuerzo && structured.cena) {
-      // lo guardamos para este día
       localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(structured));
       showToast(lang === "en" ? "Full AI day applied" : "Día IA aplicado");
       renderMenuDay(idx, week);
