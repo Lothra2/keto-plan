@@ -680,6 +680,17 @@ async function generateMealAI(idx, mealKey, week) {
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
 
+  // día base (el original) para mantener estructura
+  const baseDay = derivedPlan[idx];
+  const baseMeal = baseDay[mealKey] || {};
+  const baseQty = baseMeal.qty || "";
+  const mealPercent = mealPercents[mealKey] || 0;
+  const mealKcal = mealPercent ? Math.round((baseDay.kcal || 1600) * mealPercent) : null;
+  const qtyWithKcal = mealKcal
+    ? (baseQty ? `${baseQty} • ~${mealKcal} kcal` : `~${mealKcal} kcal`)
+    : baseQty;
+
+  // lo que ya tengamos guardado
   let existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
   let hasMeal = !!existing[mealKey];
 
@@ -693,9 +704,11 @@ async function generateMealAI(idx, mealKey, week) {
       : false;
 
   if (tip && !hasMeal && !tipConflicts) {
+    // 👇 mantenemos la comida base y solo agregamos nota
     existing[mealKey] = {
-      nombre: tip,
-      qty: lang === "en" ? "Local tip" : "Consejo local"
+      nombre: baseMeal.nombre || (lang === "en" ? "Base meal" : "Comida base"),
+      qty: qtyWithKcal,
+      note: tip
     };
     localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
     renderMenuDay(idx, week);
@@ -727,7 +740,7 @@ async function generateMealAI(idx, mealKey, week) {
         prompt,
         user: apiUser,
         pass: apiPass,
-        mode: mealKey,
+        mode: mealKey, // el backend tuyo espera esto
         lang
       })
     });
@@ -745,9 +758,11 @@ async function generateMealAI(idx, mealKey, week) {
     }
 
     const note = analyzeAIMeal(text);
+
+    // 👇 aquí mantenemos las cantidades del plan original + kcal estimadas
     existing[mealKey] = {
       nombre: text,
-      qty: lang === "en" ? "AI " + mealNameEN : "IA " + mealNameES,
+      qty: qtyWithKcal,
       ...(note ? { note } : {})
     };
     localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
@@ -760,8 +775,6 @@ async function generateMealAI(idx, mealKey, week) {
   }
 }
 window.generateMealAI = generateMealAI;
-
-
 
 
 // ====== IA: DÍA COMPLETO ======
