@@ -686,65 +686,6 @@ input:checked + .ball::after {
   color: var(--muted);
 }
 
-/* AI WEEK REVIEW (resumen IA de la semana) mejorado */
-.ai-week-review {
-  background: radial-gradient(circle at top, rgba(15,118,110,.25), rgba(15,23,42,.15));
-  border: 1px solid rgba(148,163,184,.12);
-  border-radius: .85rem;
-  padding: .55rem .65rem .45rem;
-  margin-bottom: .6rem;
-  box-shadow: 0 10px 30px rgba(0,0,0,.15);
-  display: none;
-}
-[data-theme="light"] .ai-week-review {
-  background: rgba(255,255,255,.85);
-}
-.ai-week-title {
-  display: inline-flex;
-  gap: .35rem;
-  align-items: center;
-  background: rgba(15,118,110,.16);
-  border: 1px solid rgba(15,118,110,.12);
-  padding: .25rem .6rem .3rem;
-  border-radius: 999px;
-  font-weight: 600;
-  font-size: .65rem;
-  color: var(--text);
-  margin-bottom: .55rem;
-}
-.ai-week-body {
-  display: flex;
-  flex-direction: column;
-  gap: .4rem;
-}
-.ai-week-item {
-  background: rgba(15,23,42,.25);
-  border: 1px solid rgba(148,163,184,.03);
-  border-radius: .55rem;
-  padding: .38rem .5rem .4rem;
-  font-size: .62rem;
-  line-height: 1.35;
-  position: relative;
-  overflow: hidden;
-}
-.ai-week-item::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: .4rem;
-  bottom: .4rem;
-  width: 3px;
-  background: linear-gradient(180deg, var(--primary), #f97316);
-  border-radius: 999px;
-  opacity: .8;
-}
-[data-theme="light"] .ai-week-item {
-  background: rgba(255,255,255,.7);
-}
-#aiWeekSummary {
-  margin-top: .4rem;
-}
-
 /* mobile ajuste */
 @media (max-width: 460px) {
   .ai-review-item {
@@ -848,28 +789,6 @@ input:checked + .ball::after {
   background: transparent;
   border: 1px solid rgba(148,163,184,.25);
   color: inherit;
-}
-/* estado loading en botones IA */
-.ia-btn.is-loading {
-  position: relative;
-  pointer-events: none;
-  opacity: .7;
-}
-.ia-btn.is-loading::after {
-  content: "";
-  position: absolute;
-  right: .45rem;
-  top: 50%;
-  width: .5rem;
-  height: .5rem;
-  border: 2px solid rgba(255,255,255,.45);
-  border-top-color: transparent;
-  border-radius: 999px;
-  transform: translateY(-50%);
-  animation: spin .6s linear infinite;
-}
-@keyframes spin {
-  to { transform: translateY(-50%) rotate(360deg); }
 }
 
 /* CAL BUTTON */
