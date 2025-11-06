@@ -680,43 +680,14 @@ async function generateMealAI(idx, mealKey, week) {
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
 
-  // día base para mantener estructura
-  const baseDay = derivedPlan[idx];
-  const baseMeal = baseDay[mealKey] || {};
-  const baseQty = baseMeal.qty || "";
-  const mealPercent = mealPercents[mealKey] || 0;
-  const mealKcal = mealPercent ? Math.round((baseDay.kcal || 1600) * mealPercent) : null;
-  const qtyWithKcal = mealKcal
-    ? (baseQty ? `${baseQty} • ~${mealKcal} kcal` : `~${mealKcal} kcal`)
-    : baseQty;
-
-  // lo que ya hay guardado
-  let existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
-  let hasMeal = !!existing[mealKey];
-
-  // --- 1) tip local (solo si no hay nada y no choca) ---
-  const tip = localSmartTips[mealKey];
-  const tipLower = tip ? tip.toLowerCase() : "";
-  const userDislikeLower = dislike.toLowerCase();
-  const tipConflicts =
-    tipLower && userDislikeLower
-      ? userDislikeLower.split(",").some(d => d.trim() && tipLower.includes(d.trim()))
-      : false;
-
-  if (tip && !hasMeal && !tipConflicts) {
-    // mantener estructura base, solo agregamos nota
-    existing[mealKey] = {
-      nombre: (baseMeal.nombre || mealKey.toUpperCase()) + " (IA)",
-      qty: qtyWithKcal,
-      note: tip
-    };
-    localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
-    renderMenuDay(idx, week);
-    showToast(lang === "en" ? "Used local suggestion" : "Usando sugerencia local");
-    return;
+  if (!like && !dislike) {
+    const tip = localSmartTips[mealKey];
+    if (tip) {
+      showToast(tip, 2800);
+      return;
+    }
   }
 
-  // --- 2) IA ---
   let mealNameES = "almuerzo";
   let mealNameEN = "lunch";
   if (mealKey === "desayuno") {
@@ -729,56 +700,32 @@ async function generateMealAI(idx, mealKey, week) {
 
   const prompt =
     lang === "en"
-      ? `Create 1 short keto ${mealNameEN} (~350-600 kcal). Prefer: ${like}. Avoid: ${dislike}. Respond ONLY with a short dish name, no explanation.`
-      : `Genera 1 ${mealNameES} keto corto (~350-600 kcal). Prefiere: ${like}. Evita: ${dislike}. Responde SOLO con el nombre del plato, sin explicación.`;
+      ? `Create 1 short keto ${mealNameEN} (~350-600 kcal). Prefer: ${like}. Avoid: ${dislike}. Respond ONLY with one line like "Scrambled eggs with feta and avocado (2 eggs, 30 g feta, 1/2 avocado)".`
+      : `Genera 1 ${mealNameES} keto corto (~350-600 kcal). Prefiere: ${like}. Evita: ${dislike}. Responde SOLO con una línea así: "Huevos revueltos con feta y aguacate (2 huevos, 30 g feta, 1/2 aguacate)".`;
 
   try {
     const res = await fetch(GROK_PROXY, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prompt,
-        user: apiUser,
-        pass: apiPass,
-        mode: mealKey,
-        lang
-      })
+      body: JSON.stringify({ prompt, user: apiUser, pass: apiPass, mode: mealKey, lang })
     });
-
     const data = await res.json();
     if (!data.ok) {
       showToast(data.error || (lang === "en" ? "AI did not respond" : "IA no respondió"));
       return;
     }
-
-    // limpiamos el texto de la IA
     let text = (data.text || "").replace(/\*\*/g, "").trim();
-    // quedarnos solo con la primera línea / primera oración
-    if (text.includes("\n")) text = text.split("\n")[0].trim();
-    if (text.includes(".")) {
-      const first = text.split(".")[0].trim();
-      // si la primera frase tiene sentido, la usamos
-      if (first.length > 10) text = first;
-    }
-
     if (!text) {
       showToast(lang === "en" ? "AI returned empty text" : "La IA devolvió texto vacío");
       return;
     }
-
-    // revisar lácteos u otros ingredientes
+    const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
     const note = analyzeAIMeal(text);
-
-    // 👇 aquí viene lo importante:
-    // - nombre: lo que diga la IA + "(IA)"
-    // - qty: la del plan base con kcal
-    // - note: solo si hace falta
     existing[mealKey] = {
-      nombre: `${text} · IA ${mealNameES}`,
-      qty: qtyWithKcal,
+      nombre: text,
+      qty: lang === "en" ? "AI " + mealNameEN : "IA " + mealNameES,
       ...(note ? { note } : {})
     };
-
     localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
     renderMenuDay(idx, week);
     showToast(lang === "en" ? "AI meal updated" : "Comida IA actualizada");
@@ -788,8 +735,6 @@ async function generateMealAI(idx, mealKey, week) {
   }
 }
 window.generateMealAI = generateMealAI;
-
-
 
 // ====== IA: DÍA COMPLETO ======
 async function generateFullDayAI(idx, week) {
@@ -1426,8 +1371,6 @@ function renderProgreso() {
     const hasData = saved.peso || saved.cintura || saved.energia || saved.notas || saved.exkcal;
     const card = document.createElement("div");
     card.className = "day-card";
-    card.id = `day-${idx}`;
-
     card.innerHTML = `
       <div class="day-title"><h2>${d.dia}</h2><span class="kcal">${d.kcal} kcal</span></div>
       <div class="prog-form" id="prog-form-${idx}" ${hasData ? 'style="display:none"' : ''}>
