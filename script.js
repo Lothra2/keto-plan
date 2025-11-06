@@ -680,13 +680,19 @@ async function generateMealAI(idx, mealKey, week) {
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
 
-  // leer lo que ya tengamos guardado para ese día
-  const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
-  const alreadyHasMeal = !!existing[mealKey];
+  let existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
+  let hasMeal = !!existing[mealKey];
 
-  // ✅ 1) si HAY tip local y TODAVÍA no hay nada guardado para esa comida → usar local
+  // --- 1) intentar tip local pero solo si no choca con dislikes ---
   const tip = localSmartTips[mealKey];
-  if (tip && !alreadyHasMeal) {
+  const tipLower = tip ? tip.toLowerCase() : "";
+  const userDislikeLower = dislike.toLowerCase();
+  const tipConflicts =
+    tipLower && userDislikeLower
+      ? userDislikeLower.split(",").some(d => d.trim() && tipLower.includes(d.trim()))
+      : false;
+
+  if (tip && !hasMeal && !tipConflicts) {
     existing[mealKey] = {
       nombre: tip,
       qty: lang === "en" ? "Local tip" : "Consejo local"
@@ -697,7 +703,7 @@ async function generateMealAI(idx, mealKey, week) {
     return;
   }
 
-  // ✅ 2) si ya había algo (local) o no hay tip → vamos con IA
+  // --- 2) IA ---
   let mealNameES = "almuerzo";
   let mealNameEN = "lunch";
   if (mealKey === "desayuno") {
@@ -710,8 +716,8 @@ async function generateMealAI(idx, mealKey, week) {
 
   const prompt =
     lang === "en"
-      ? `Create 1 short keto ${mealNameEN} (~350-600 kcal). Prefer: ${like}. Avoid: ${dislike}. Respond ONLY with one line like "Scrambled eggs with feta and avocado (2 eggs, 30 g feta, 1/2 avocado)".`
-      : `Genera 1 ${mealNameES} keto corto (~350-600 kcal). Prefiere: ${like}. Evita: ${dislike}. Responde SOLO con una línea así: "Huevos revueltos con feta y aguacate (2 huevos, 30 g feta, 1/2 aguacate)".`;
+      ? `Create 1 short keto ${mealNameEN} (~350-600 kcal). Prefer: ${like}. Avoid: ${dislike}. Make it DIFFERENT from a chicken salad with spinach and feta. Respond ONLY with one line.`
+      : `Genera 1 ${mealNameES} keto corto (~350-600 kcal). Prefiere: ${like}. Evita: ${dislike}. Que sea DIFERENTE a una ensalada de pollo con espinaca y feta. Responde SOLO con una línea.`;
 
   try {
     const res = await fetch(GROK_PROXY, {
@@ -721,7 +727,7 @@ async function generateMealAI(idx, mealKey, week) {
         prompt,
         user: apiUser,
         pass: apiPass,
-        mode: mealKey, // formato viejo: "desayuno" | "almuerzo" | "cena"
+        mode: mealKey,
         lang
       })
     });
@@ -754,6 +760,8 @@ async function generateMealAI(idx, mealKey, week) {
   }
 }
 window.generateMealAI = generateMealAI;
+
+
 
 
 // ====== IA: DÍA COMPLETO ======
