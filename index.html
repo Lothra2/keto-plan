@@ -75,7 +75,7 @@
         </div>
       </div>
 
-      <!-- Motivación general (sigue existiendo, pero el mensaje del día va en la card) -->
+      <!-- Motivación -->
       <div
         id="motivation"
         class="motivation-box"
@@ -90,10 +90,6 @@
         <button class="ia-btn ghost" id="aiGenerateWeekBtn">
           Generar semana con IA 🤖
         </button>
-        <!-- NUEVO: revisión IA de la semana -->
-        <button class="ia-btn ghost" id="aiWeeklyReviewBtn">
-          Revisar semana con IA 📊
-        </button>
       </div>
 
       <!-- Selector de semanas -->
@@ -101,9 +97,6 @@
 
       <!-- Pastillas de días -->
       <div class="day-floating" id="dayFloating"></div>
-
-      <!-- AQUÍ mostraremos el resumen IA de la semana -->
-      <div id="aiWeekSummary" class="ai-week-review" style="display: none"></div>
 
       <!-- Aquí se renderiza el día seleccionado -->
       <div id="menuDays"></div>
@@ -187,24 +180,6 @@
           <option value="#f97316">Naranja</option>
           <option value="#0ea5e9">Cian</option>
         </select>
-      </div>
-
-      <!-- Agua diaria -->
-      <div class="list-row">
-        <strong>Agua diaria</strong>
-        <p class="small">
-          Define tu meta de agua por día (en ml). Se usa en cada día del plan.
-        </p>
-        <input
-          id="waterGoalInput"
-          type="number"
-          placeholder="Ej. 2400"
-          min="1000"
-          step="100"
-        />
-        <button class="save-btn" onclick="saveWaterGoal()">
-          Guardar meta de agua
-        </button>
       </div>
 
       <!-- Preferencias IA -->
