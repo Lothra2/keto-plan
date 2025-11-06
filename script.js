@@ -680,13 +680,13 @@ async function generateMealAI(idx, mealKey, week) {
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
 
-  // ✅ PRIMERO: usar sugerencias locales si existen
-  // Antes este bloque dependía de si había o no preferencias (like/dislike),
-  // pero ahora los locales siempre tienen prioridad. Si existe un tip local,
-  // lo usamos directamente y no llamamos a la IA.
+  // leer lo que ya tengamos guardado para ese día
+  const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
+  const alreadyHasMeal = !!existing[mealKey];
+
+  // ✅ 1) si HAY tip local y TODAVÍA no hay nada guardado para esa comida → usar local
   const tip = localSmartTips[mealKey];
-  if (tip) {
-    const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
+  if (tip && !alreadyHasMeal) {
     existing[mealKey] = {
       nombre: tip,
       qty: lang === "en" ? "Local tip" : "Consejo local"
@@ -694,10 +694,10 @@ async function generateMealAI(idx, mealKey, week) {
     localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
     renderMenuDay(idx, week);
     showToast(lang === "en" ? "Used local suggestion" : "Usando sugerencia local");
-    return; // 👈 no llamar a la IA si hay tip local
+    return;
   }
 
-  // 🔹 SI NO HAY TIP LOCAL → generar con IA
+  // ✅ 2) si ya había algo (local) o no hay tip → vamos con IA
   let mealNameES = "almuerzo";
   let mealNameEN = "lunch";
   if (mealKey === "desayuno") {
@@ -721,7 +721,7 @@ async function generateMealAI(idx, mealKey, week) {
         prompt,
         user: apiUser,
         pass: apiPass,
-        mode: mealKey, // 👈 volvemos al formato clásico: "desayuno" | "almuerzo" | "cena"
+        mode: mealKey, // formato viejo: "desayuno" | "almuerzo" | "cena"
         lang
       })
     });
@@ -738,8 +738,6 @@ async function generateMealAI(idx, mealKey, week) {
       return;
     }
 
-    // Guardar comida IA generada
-    const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
     const note = analyzeAIMeal(text);
     existing[mealKey] = {
       nombre: text,
@@ -756,6 +754,7 @@ async function generateMealAI(idx, mealKey, week) {
   }
 }
 window.generateMealAI = generateMealAI;
+
 
 // ====== IA: DÍA COMPLETO ======
 async function generateFullDayAI(idx, week) {
