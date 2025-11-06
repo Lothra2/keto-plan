@@ -520,7 +520,6 @@ function renderMenuDay(idx, week) {
   const done = localStorage.getItem(LS_PREFIX + "done-" + idx) === "1";
   const card = document.createElement("div");
   card.className = "day-card";
-  card.id = `day-${idx}`; // <-- CORRECCIÓN: Añadido ID para que los selectores funcionen.
 
   const dayIndexInWeek = (idx % 7);
   const workout = getWorkoutForDay(week, dayIndexInWeek);
@@ -577,8 +576,6 @@ function renderMenuDay(idx, week) {
       ${buildMealBlock(idx, week, "snackPM", "🥜 " + (appLang === "en" ? "Snack PM" : "Snack PM"), day.snackPM, calState.meals.snackPM)}
       ${buildMealBlock(idx, week, "cena", "🍖 " + (appLang === "en" ? "Dinner" : "Cena"), day.cena, calState.meals.cena, true)}
     </div>
-    <!-- Contenedor para el día completo generado por IA -->
-    <div id="aiDayOutput-${idx}"></div>
     <div class="ai-extras-box" id="ai-extras-${idx}" style="display:none"></div>
     <div class="workout-box">
       <strong>${appLang === "en" ? "Weekly focus" : "Foco semanal"}:</strong>
@@ -610,15 +607,6 @@ function renderMenuDay(idx, week) {
       const parsed = JSON.parse(savedWorkout);
       renderWorkoutCardsFromArray(idx, parsed, appLang);
     } catch (e) {}
-  }
-  
-  // Si hay un día IA guardado, lo renderizamos en su contenedor
-  const aiDayStored = localStorage.getItem(LS_AI_DAY_PREFIX + idx);
-  if (aiDayStored) {
-    try {
-        const parsed = JSON.parse(aiDayStored);
-        renderAiDay(parsed.rawText, idx, `aiDayOutput-${idx}`);
-    } catch(e) {}
   }
 
   renderAIExtras(idx);
@@ -691,6 +679,16 @@ async function generateMealAI(idx, mealKey, week) {
   const lang = appLang;
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
+
+  // si no hay prefs guardadas, mostramos el tip local y no gastamos IA
+  if (!like && !dislike) {
+    const tip = localSmartTips[mealKey];
+    if (tip) {
+      showToast(tip, 2800);
+      return;
+    }
+  }
+
   let mealNameES = "almuerzo";
   let mealNameEN = "lunch";
   if (mealKey === "desayuno") {
@@ -700,43 +698,26 @@ async function generateMealAI(idx, mealKey, week) {
     mealNameES = "cena";
     mealNameEN = "dinner";
   }
-  const baseDay = derivedPlan[idx];
 
-  // Si el usuario está en un día generado por IA, el botón debe funcionar igual.
-  // Ocultamos el grid de comidas base si existe y nos aseguramos que el contenedor IA esté visible.
-  const foodGrid = document.querySelector(`#day-${idx} .food-grid`);
-  const aiDayOutput = document.getElementById(`aiDayOutput-${idx}`);
-  if (foodGrid) foodGrid.style.display = 'none';
-  if (aiDayOutput && aiDayOutput.innerHTML === '') {
-      renderAiDay('', idx, `aiDayOutput-${idx}`); // Prepara el contenedor si está vacío
-  }
-
-  // --- CORRECCIÓN FINAL (AHORA SÍ) ---
-  // Usamos el formato de prompt del script anterior que sí funcionaba.
-  // Este prompt es muy específico sobre el formato de la respuesta, lo cual es crucial.
   const prompt =
     lang === "en"
       ? `Create 1 short keto ${mealNameEN} (~350-600 kcal). Prefer: ${like}. Avoid: ${dislike}. Respond ONLY with one line like "Scrambled eggs with feta and avocado (2 eggs, 30 g feta, 1/2 avocado)".`
       : `Genera 1 ${mealNameES} keto corto (~350-600 kcal). Prefiere: ${like}. Evita: ${dislike}. Responde SOLO con una línea así: "Huevos revueltos con feta y aguacate (2 huevos, 30 g feta, 1/2 aguacate)".`;
 
-  // CORRECCIÓN: Usar un 'mode' fijo que el backend pueda reconocer y pasar el tipo de comida en otro campo.
-  const payload = {
-    mode: "meal", // <-- Nombre fijo que el backend sí puede reconocer
-    meal: mealKey, // <-- Aquí se especifica qué comida es: desayuno/almuerzo/cena
-    prompt,
-    lang,
-    user: apiUser,
-    pass: apiPass
-  };
-
   try {
     const res = await fetch(GROK_PROXY, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        mode: "meal",          // 👈 modo fijo que tu función de Netlify sí puede mapear
+        meal: mealKey,         // 👈 aquí le dices cuál comida quieres: desayuno/almuerzo/cena
+        prompt,
+        lang,
+        user: apiUser,
+        pass: apiPass
+      })
     });
 
-    // CORRECCIÓN: Proteger el .json() por si la API devuelve un error HTML.
     let data;
     try {
       data = await res.json();
@@ -757,36 +738,25 @@ async function generateMealAI(idx, mealKey, week) {
       return;
     }
 
-    // Lógica para actualizar el día IA en localStorage
-    const aiDayStored = localStorage.getItem(LS_AI_DAY_PREFIX + idx);
-    let dayData;
-    if (aiDayStored) {
-        dayData = JSON.parse(aiDayStored);
-    } else {
-        // Si no hay día IA, creamos uno a partir del plan base para no perder las otras comidas al generar la primera.
-        dayData = { rawText: `Desayuno: ${baseDay.desayuno.nombre}\nAlmuerzo: ${baseDay.almuerzo.nombre}\nCena: ${baseDay.cena.nombre}` };
-    }
+    // guardamos solo esa comida sobre el día
+    const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
+    const note = analyzeAIMeal(text);
+    existing[mealKey] = {
+      nombre: text,
+      qty: lang === "en" ? "AI " + mealNameEN : "IA " + mealNameES,
+      ...(note ? { note } : {})
+    };
+    localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
 
-    // Reemplazamos la comida específica en el texto crudo y lo guardamos
-    const mealTitleES = mealKey === 'desayuno' ? 'Desayuno' : (mealKey === 'almuerzo' ? 'Almuerzo' : 'Cena');
-    const mealTitleEN = mealKey === 'desayuno' ? 'Breakfast' : (mealKey === 'almuerzo' ? 'Lunch' : 'Dinner');
-    const mealTitleRegex = new RegExp(`(${mealTitleES}|${mealTitleEN}):.*`, "i");
-
-    if (dayData.rawText.match(mealTitleRegex)) {
-        dayData.rawText = dayData.rawText.replace(mealTitleRegex, `${mealTitleES}: ${text}`);
-    } else {
-        dayData.rawText += `\n${mealTitleES}: ${text}`;
-    }
-    localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(dayData));
-
-    // En lugar de recargar todo, actualizamos solo la comida
-    renderSingleMeal(text, idx, mealKey);
+    renderMenuDay(idx, week);
+    showToast(lang === "en" ? "AI meal updated" : "Comida IA actualizada");
   } catch (e) {
     console.error(e);
     showToast(appLang === "en" ? "Error calling AI" : "Error llamando a la IA");
   }
 }
 window.generateMealAI = generateMealAI;
+
 
 // ====== IA: DÍA COMPLETO ======
 async function generateFullDayAI(idx, week) {
@@ -821,21 +791,28 @@ async function generateFullDayAI(idx, week) {
       return;
     }
 
-    const aiResponseText = data.text || "";
-    if (aiResponseText) {
-      // Guardamos el texto crudo para poder re-renderizarlo
-      const dayData = {
-        rawText: aiResponseText,
-        // Podríamos guardar más data estructurada si la API la devuelve
+    let structured = null;
+    if (data.structured) {
+      structured = data.structured;
+    } else if (data.text) {
+      try {
+        structured = JSON.parse(data.text);
+      } catch(e) {}
+    }
+
+    if (structured) {
+      const normalized = {
+        dia: baseDay.dia,
+        kcal: structured.kcal || baseDay.kcal,
+        macros: structured.macros || baseDay.macros,
+        desayuno: structured.desayuno || baseDay.desayuno,
+        snackAM: structured.snackAM || baseDay.snackAM,
+        almuerzo: structured.almuerzo || baseDay.almuerzo,
+        snackPM: structured.snackPM || baseDay.snackPM,
+        cena: structured.cena || baseDay.cena
       };
-      localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(dayData));
-      
-      // Ocultamos el grid de comidas base y renderizamos el de la IA
-      const foodGrid = document.querySelector(`#day-${idx} .food-grid`);
-      if (foodGrid) {
-        foodGrid.style.display = 'none';
-      }
-      renderAiDay(aiResponseText, idx, `aiDayOutput-${idx}`);
+      localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(normalized));
+      renderMenuDay(idx, week);
       showToast(lang === "en" ? "Full AI day applied" : "Día IA aplicado");
     } else {
       showToast(lang === "en" ? "AI answered but was not structured" : "La IA respondió pero no en formato estructurado");
@@ -846,107 +823,6 @@ async function generateFullDayAI(idx, week) {
   }
 }
 window.generateFullDayAI = generateFullDayAI;
-
-/**
- * =================================================================
- * NUEVAS FUNCIONES DE RENDERIZADO PARA CONTENIDO IA
- * =================================================================
- */
-
-/**
- * Parsea el texto plano de la IA y lo convierte en un array de objetos estructurados.
- * @param {string} text - El texto completo generado por la IA para un día.
- * @returns {Array<Object>} - Un array de objetos, cada uno representando una tarjeta (comida, tip, etc.).
- */
-function parseAiDayContent(text) {
-  if (!text) return [];
-  const mealTypes = [
-    "Desayuno", "Snack AM", "Almuerzo", "Snack PM", "Cena", 
-    "Foco semanal", "Tip", "Nota", "Breakfast", "Lunch", "Dinner", "Weekly Focus", "Note"
-  ];
-  
-  const regex = new RegExp(`(${mealTypes.join('|')}):`, 'gi');
-  const parts = text.split(regex).filter(part => part.trim() !== '');
-
-  const structuredContent = [];
-  for (let i = 0; i < parts.length; i += 2) {
-    if (parts[i] && parts[i+1]) {
-      const title = parts[i].trim();
-      const description = parts[i+1].trim();
-      structuredContent.push({ title, description });
-    }
-  }
-  
-  if (structuredContent.length === 0 && text.trim().length > 0) {
-    return [{ title: 'Plan del Día', description: text.trim() }];
-  }
-
-  return structuredContent;
-}
-
-/**
- * Convierte un objeto de comida/sección estructurado en una tarjeta HTML.
- * @param {Object} item - Objeto con { title, description }.
- * @param {number} day - El número del día (para asociar acciones IA).
- * @returns {string} - El string HTML para la tarjeta.
- */
-function createMealCardHTML(item, day) {
-  const { title, description } = item;
-  const lowerTitle = title.toLowerCase();
-
-  const icons = {
-    'desayuno': '🍳', 'breakfast': '🍳',
-    'almuerzo': '🥗', 'lunch': '🥗',
-    'cena': '🍲', 'dinner': '🍲',
-    'snack am': '🍎', 'snack pm': '🥜',
-    'foco semanal': '🎯', 'weekly focus': '🎯',
-    'tip': '💡',
-    'nota': '📝', 'note': '📝'
-  };
-  const icon = icons[lowerTitle] || '🍽️';
-
-  if (lowerTitle === 'tip' || lowerTitle === 'nota' || lowerTitle === 'note') {
-    return `<div class="meal-content"><p class="callout"><strong>${title}:</strong> ${description}</p></div>`;
-  }
-
-  return `
-    <div class="meal-card" data-meal-type="${lowerTitle}">
-      <div class="meal-header">
-        <span class="meal-icon">${icon}</span>
-        <strong>${title}</strong>
-        <button class="ia-btn small-btn" onclick="generateMealAI(${day}, '${lowerTitle}')" title="Generar nueva opción con IA">IA +</button>
-      </div>
-      <div class="meal-content">
-        <p>${description.replace(/\n/g, '<br>')}</p>
-      </div>
-    </div>
-  `;
-}
-
-function renderAiDay(aiResponseText, day, containerId) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  const structuredContent = parseAiDayContent(aiResponseText);
-  container.innerHTML = structuredContent.map(item => createMealCardHTML(item, day)).join('');
-}
-
-function renderSingleMeal(aiResponseText, day, mealType) {
-  const lowerMealType = mealType.toLowerCase();
-  const mealCard = document.querySelector(`#aiDayOutput-${day} .meal-card[data-meal-type="${lowerMealType}"]`);
-  
-  if (mealCard) {
-    const mealContent = mealCard.querySelector('.meal-content p');
-    if (mealContent) mealContent.innerHTML = aiResponseText.replace(/\n/g, '<br>');
-  } else {
-    // Si la tarjeta no existe (porque venimos de un plan base), recargamos el día completo.
-    // Esto asegura que la estructura de tarjetas IA se cree correctamente.
-    const aiDayStored = localStorage.getItem(LS_AI_DAY_PREFIX + day);
-    if (aiDayStored) {
-        const parsed = JSON.parse(aiDayStored);
-        renderAiDay(parsed.rawText, day, `aiDayOutput-${day}`);
-    }
-  }
-}
 
 // ====== IA: REVISAR DÍA (card bonita) ======
 async function reviewDayWithAI(idx, week) {
@@ -1517,6 +1393,8 @@ function renderProgreso() {
     const hasData = saved.peso || saved.cintura || saved.energia || saved.notas || saved.exkcal;
     const card = document.createElement("div");
     card.className = "day-card";
+    card.id = `day-${idx}`;
+
     card.innerHTML = `
       <div class="day-title"><h2>${d.dia}</h2><span class="kcal">${d.kcal} kcal</span></div>
       <div class="prog-form" id="prog-form-${idx}" ${hasData ? 'style="display:none"' : ''}>
