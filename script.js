@@ -16,10 +16,12 @@ const LS_API_USER = LS_PREFIX + "api-user";
 const LS_API_PASS = LS_PREFIX + "api-pass";
 const LS_AI_DAY_PREFIX = LS_PREFIX + "ai-day-";
 const LS_AI_WORKOUT = LS_PREFIX + "ai-workout-"; // guardar entreno IA por día
+const LS_AI_WEEK_PREFIX = LS_PREFIX + "ai-week-"; // guardar revisión IA por semana
 const LS_CAL_PREFIX = LS_PREFIX + "cal-";
 const LS_PROGRESS_PREFIX = LS_PREFIX + "prog-";
 const LS_SELECTED_DAY = LS_PREFIX + "sel-day";
 const LS_SELECTED_WEEK = LS_PREFIX + "sel-week";
+
 // agua
 const LS_WATER_PREFIX = LS_PREFIX + "water-";
 const LS_WATER_GOAL = LS_PREFIX + "water-goal";
@@ -800,7 +802,7 @@ async function generateFullDayAI(idx, week) {
 }
 window.generateFullDayAI = generateFullDayAI;
 
-// ====== IA: REVISAR DÍA SIN REEMPLAZAR (ahora en la card) ======
+// ====== IA: REVISAR DÍA (card bonita) ======
 async function reviewDayWithAI(idx, week) {
   const lang = appLang;
   const apiUser = localStorage.getItem(LS_API_USER) || "";
@@ -826,15 +828,9 @@ async function reviewDayWithAI(idx, week) {
 
     const reviewBox = document.getElementById("ai-review-" + idx);
     if (reviewBox) {
-      // limpiamos y tratamos de dividir en 3 partes
       const raw = (data.text || "").replace(/\*/g, "").trim();
-
-      // lo partimos por saltos de línea o por " - "
       let parts = raw.split(/\n| - |\u2022/g).map(t => t.trim()).filter(Boolean);
-      // nos quedamos con máximo 3
       parts = parts.slice(0, 3);
-
-      // si viniera todo en una línea, lo metemos completo en el primero
       if (!parts.length) {
         parts = [raw];
       }
@@ -873,7 +869,7 @@ async function reviewDayWithAI(idx, week) {
 }
 window.reviewDayWithAI = reviewDayWithAI;
 
-// ====== WORKOUT IA ====== (igual que antes, solo reorganizado)
+// ====== WORKOUT IA ======
 function extractJSONSnippet(raw) {
   if (!raw) return null;
   const fence = raw.match(/```(?:json)?([\s\S]*?)```/i);
@@ -1013,6 +1009,143 @@ async function generateWeekWithAI(week) {
   showToast(appLang === "en" ? "Week generated with AI" : "Semana generada con IA");
 }
 window.generateWeekWithAI = generateWeekWithAI;
+
+// ====== RENDERIZAR REVISIÓN SEMANAL GUARDADA ======
+function renderStoredWeekReview(week) {
+  const box = document.getElementById("aiWeekSummary");
+  if (!box) return;
+  const saved = localStorage.getItem(LS_AI_WEEK_PREFIX + week);
+  if (saved) {
+    box.innerHTML = saved;
+    box.style.display = "block";
+  } else {
+    box.innerHTML = "";
+    box.style.display = "none";
+  }
+}
+
+
+// ====== IA: REVISIÓN SEMANAL (NUEVO) ======
+async function reviewWeekWithAI() {
+  const lang = appLang;
+  const apiUser = localStorage.getItem(LS_API_USER) || "";
+  const apiPass = localStorage.getItem(LS_API_PASS) || "";
+  const selWeek = Number(localStorage.getItem(LS_SELECTED_WEEK)) || 1;
+
+  const startIdx = (selWeek - 1) * 7;
+  const weekDays = [];
+  for (let i = 0; i < 7; i++) {
+    const idx = startIdx + i;
+    const d = getDayWithAI(idx);
+    if (!d) continue;
+    weekDays.push({
+      name: d.dia || (lang === "en" ? `Day ${idx + 1}` : `Día ${idx + 1}`),
+      kcal: d.kcal || 0,
+      breakfast: d.desayuno ? d.desayuno.nombre : "",
+      lunch: d.almuerzo ? d.almuerzo.nombre : "",
+      dinner: d.cena ? d.cena.nombre : ""
+    });
+  }
+
+  const prompt =
+    lang === "en"
+      ? `You will receive a 7-day keto plan. Analyze consistency, days that deviated, and 1 recommendation for next week. Return exactly 3 short sections: 1) Consistency, 2) Deviations, 3) Recommendation. Here is the week: ${JSON.stringify(
+          weekDays
+        )}`
+      : `Vas a recibir un plan keto de 7 días. Analiza: 1) qué tan consistente fue, 2) qué días se desviaron, 3) una recomendación para la siguiente semana. Devuélvelo en 3 secciones cortas con título. Semana: ${JSON.stringify(
+          weekDays
+        )}`;
+
+  try {
+    const res = await fetch(GROK_PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: "review-week",
+        user: apiUser,
+        pass: apiPass,
+        lang,
+        prompt
+      })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      showToast(data.error || (lang === "en" ? "AI did not respond" : "IA no respondió"));
+      return;
+    }
+
+    const box = document.getElementById("aiWeekSummary");
+    if (box) {
+      // limpiamos los ### que trae la IA
+      const clean = (data.text || "").replace(/\*/g, "").replace(/###\s*/g, "").trim();
+      const parts = clean.split(/\n+/).filter(Boolean).slice(0, 4);
+
+      const html = `
+        <div class="ai-week-title">${lang === "en" ? "AI weekly review" : "Revisión IA de la semana"}</div>
+        <div class="ai-week-body">
+          ${parts
+            .map((t) => `<div class="ai-week-item">${t}</div>`)
+            .join("")}
+        </div>
+      `;
+
+      box.innerHTML = html;
+      box.style.display = "block";
+
+      // guardar esta revisión pero asociada a ESA semana
+      localStorage.setItem(LS_AI_WEEK_PREFIX + selWeek, html);
+    }
+
+    showToast(lang === "en" ? "Week reviewed" : "Semana revisada");
+  } catch (err) {
+    console.error(err);
+    showToast(lang === "en" ? "Error calling AI" : "Error llamando a la IA");
+  }
+}
+
+window.reviewWeekWithAI = reviewWeekWithAI;
+
+// ====== IA: MOTIVACIÓN DEL DÍA (NUEVO) ======
+async function motivateDayWithAI() {
+  const lang = appLang;
+  const apiUser = localStorage.getItem(LS_API_USER) || "";
+  const apiPass = localStorage.getItem(LS_API_PASS) || "";
+  const selDay = Number(localStorage.getItem(LS_SELECTED_DAY)) || 0;
+  const d = getDayWithAI(selDay);
+  const prompt =
+    lang === "en"
+      ? `Give me a short, energetic, second-person motivation message (max 35 words) for someone doing a keto plan. Mention today's meal very lightly and discipline.`
+      : `Dame un mensaje motivacional corto, en segunda persona, máximo 35 palabras, para alguien que está siguiendo un plan keto. Menciona muy ligero que ya tiene su menú y que siga disciplinado.`;
+
+  try {
+    const res = await fetch(GROK_PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: "motivation",
+        user: apiUser,
+        pass: apiPass,
+        lang,
+        prompt
+      })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      showToast(data.error || (lang === "en" ? "AI did not respond" : "IA no respondió"));
+      return;
+    }
+    const motBox = document.getElementById("motivation");
+    if (motBox) {
+      motBox.textContent = (data.text || "").replace(/\*/g, "").trim();
+      motBox.style.display = "block";
+    }
+    showToast(lang === "en" ? "Motivation ready" : "Motivación lista");
+  } catch (err) {
+    console.error(err);
+    showToast(lang === "en" ? "Error calling AI" : "Error llamando a la IA");
+  }
+}
+window.motivateDayWithAI = motivateDayWithAI;
 
 // ====== COMPRAS ======
 function renderCompras() {
@@ -1480,25 +1613,21 @@ document.querySelectorAll(".bottom-btn").forEach(btn => {
 document.addEventListener("click", e => {
   const btn = e.target.closest(".week-btn");
   if (btn) {
-    // 1. marcar visualmente
     document.querySelectorAll(".week-btn").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
 
-    // 2. semana seleccionada
     const week = Number(btn.dataset.week);
     localStorage.setItem(LS_SELECTED_WEEK, String(week));
 
-    // 3. renderizar las pastillas de esa semana
     renderDayPills(week);
 
-    // 4. **forzar siempre el primer día de esa semana**
-    const firstDayIndex = (week - 1) * 7; // 0,7,14,21...
+    const firstDayIndex = (week - 1) * 7;
     localStorage.setItem(LS_SELECTED_DAY, String(firstDayIndex));
     renderMenuDay(firstDayIndex, week);
+    // 👇 nuevo: mostrar revisión de esa semana si existe
+    renderStoredWeekReview(week);
   }
 });
-
-
 
 // ====== THEME ======
 const themeToggle = document.getElementById("themeToggle");
@@ -1602,7 +1731,6 @@ function saveWaterGoal() {
   }
   localStorage.setItem(LS_WATER_GOAL, String(val));
   showToast(appLang === "en" ? "Water goal saved" : "Meta de agua guardada");
-  // re-render día actual para que tome la nueva meta
   const curIdx = Number(localStorage.getItem(LS_SELECTED_DAY)) || getCurrentDayIndex();
   const curWeek = Number(localStorage.getItem(LS_SELECTED_WEEK)) || (Math.floor(curIdx / 7) + 1);
   renderMenuDay(curIdx, curWeek);
@@ -1734,13 +1862,10 @@ function drawExerciseChart() {
 
   for (let idx = 0; idx < derivedPlan.length; idx++) {
     labels.push(derivedPlan[idx].dia);
-    // kcal plan del día
     planKcal.push(derivedPlan[idx].kcal || 0);
 
     const saved = JSON.parse(localStorage.getItem(LS_PROGRESS_PREFIX + idx) || "{}");
-    // kcal de ejercicio que metió el usuario
     exerciseKcal.push(saved.exkcal ? Number(saved.exkcal) : 0);
-    // energía auto-reportada
     energy.push(saved.energia ? Number(saved.energia) : 0);
   }
 
@@ -1811,49 +1936,71 @@ function drawExerciseChart() {
           position: "right",
           ticks: { color: axisColor },
           grid: { drawOnChartArea: false },
+          title: { display: true, text: appLang === "en" ? "Energy" : "Energía", color: axisColor, font: { size: 10 } },
           suggestedMin: 0,
-          suggestedMax: 10,
-          title: { display: true, text: "1-10", color: axisColor, font: { size: 10 } }
+          suggestedMax: 10
         }
       }
     }
   });
 }
 
-// ====== INIT ======
+// ====== INICIALIZACIÓN ======
 function initApp() {
   appLang = localStorage.getItem(LS_LANG) || "es";
   currentWeeks = Number(localStorage.getItem(LS_PLAN_WEEKS)) || 2;
   dailyView = Number(localStorage.getItem(LS_DAILY_VIEW)) || 0;
 
-  // construir plan según semanas
   derivedPlan = buildPlan(currentWeeks);
+  renderWeekButtons();
 
-  // aplicar color guardado
+  const idx = getCurrentDayIndex();
+  const week = Math.floor(idx / 7) + 1;
+  if (!dailyView) {
+    setWeekActive(week);
+    renderDayPills(week);
+  }
+  renderMenuDay(idx, week);
+  renderStoredWeekReview(week); // 👈 nuevo
+  updateProgressBar();
+  showMotivation();
+
+  const savedName = localStorage.getItem(LS_NAME);
+  if (savedName) {
+    setHeaderName(savedName);
+  } else {
+    document.getElementById("nameModal").style.display = "flex";
+  }
+
   const savedColor = localStorage.getItem(LS_PRIMARY);
   if (savedColor) {
     document.documentElement.style.setProperty("--primary", savedColor);
   }
 
-  renderWeekButtons();
   askStartDateIfNeeded();
 
-  const savedName = localStorage.getItem(LS_NAME);
-  if (savedName) {
-    setHeaderName(savedName);
-    setRandomTip(savedName);
-  } else {
-    setRandomTip();
+  // listener para el botón semanal IA y motivación IA
+  const weekBtn = document.getElementById("aiWeeklyReviewBtn");
+  if (weekBtn) {
+    weekBtn.addEventListener("click", () => {
+      weekBtn.classList.add("is-loading");
+      reviewWeekWithAI().finally(() => weekBtn.classList.remove("is-loading"));
+    });
   }
 
-  // ir directo al menú
-  switchTab("menu");
-
-  // splash si existe
-  const splash = document.querySelector(".splash");
-  if (splash) {
-    setTimeout(() => splash.remove(), 1600);
+  const aiGlobal = document.querySelector(".ai-global-actions");
+  if (aiGlobal && !document.getElementById("aiMotivationBtn")) {
+    const btn = document.createElement("button");
+    btn.id = "aiMotivationBtn";
+    btn.className = "ia-btn ghost";
+    btn.textContent = "Motivar con IA 💬";
+    btn.addEventListener("click", () => {
+      btn.classList.add("is-loading");
+      motivateDayWithAI().finally(() => btn.classList.remove("is-loading"));
+    });
+    aiGlobal.appendChild(btn);
   }
+
+  document.getElementById("splash-screen").classList.add("hide");
 }
-
 document.addEventListener("DOMContentLoaded", initApp);
