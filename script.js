@@ -8,13 +8,14 @@ const LS_DAILY_VIEW = LS_PREFIX + "daily-view";
 const LS_PRIMARY = LS_PREFIX + "primary-color";
 const LS_HEIGHT = LS_PREFIX + "height-cm";
 const LS_START_WEIGHT = LS_PREFIX + "start-weight";
+const LS_AGE = LS_PREFIX + "age";
 const LS_LANG = LS_PREFIX + "lang";
 const LS_LIKE = LS_PREFIX + "like-foods";
 const LS_DISLIKE = LS_PREFIX + "dislike-foods";
 const LS_API_USER = LS_PREFIX + "api-user";
 const LS_API_PASS = LS_PREFIX + "api-pass";
 const LS_AI_DAY_PREFIX = LS_PREFIX + "ai-day-";
-const LS_AI_WORKOUT = LS_PREFIX + "ai-workout-"; // 👈 nuevo: guardar entreno IA por día
+const LS_AI_WORKOUT = LS_PREFIX + "ai-workout-"; // guardar entreno IA por día
 const LS_CAL_PREFIX = LS_PREFIX + "cal-";
 const LS_PROGRESS_PREFIX = LS_PREFIX + "prog-";
 const LS_SELECTED_DAY = LS_PREFIX + "sel-day";
@@ -257,7 +258,12 @@ function renderWeekButtons() {
     const btn = document.createElement("div");
     btn.className = "week-btn" + (w === 1 ? " active" : "");
     btn.dataset.week = w;
-    btn.textContent = (appLang === "en" ? "Week " : "Semana ") + w + " (" + ((w - 1) * 7 + 1) + "-" + (w * 7) + ")";
+    const start = (w - 1) * 7 + 1;
+    const end = w * 7;
+    btn.innerHTML = `
+      <span class="week-title">${appLang === "en" ? "Week " : "Semana "} ${w}</span>
+      <span class="week-range">(${start}-${end})</span>
+    `;
     ws.appendChild(btn);
   }
   ws.style.display = dailyView ? "none" : "flex";
@@ -437,15 +443,13 @@ function renderMenuDay(idx, week) {
   `;
   menuDays.appendChild(card);
 
-  // 👇 si hay un entreno IA guardado para este día, lo mostramos
+  // si hay un entreno IA guardado para este día, lo mostramos
   const savedWorkout = localStorage.getItem(LS_AI_WORKOUT + idx);
   if (savedWorkout) {
     try {
       const parsed = JSON.parse(savedWorkout);
       renderWorkoutCardsFromArray(idx, parsed, appLang);
-    } catch (e) {
-      // si está roto, no hacemos nada
-    }
+    } catch (e) {}
   }
 
   animateCards();
@@ -459,7 +463,6 @@ function buildMealBlock(idx, week, key, title, mealObj, done, isDinner = false) 
   const qty = mealObj && mealObj.qty ? mealObj.qty : "";
   const name = mealObj && mealObj.nombre ? mealObj.nombre : "";
 
-  // ahora también la cena puede tener IA
   const canIA = (key === "desayuno" || key === "almuerzo" || key === "cena");
 
   return `
@@ -513,7 +516,7 @@ function cleanAiDinnerText(raw) {
   return text;
 }
 
-// ====== IA: DINNER ======
+// ====== IA: DINNER (botón separado) ======
 async function generateDinnerAI(idx) {
   const like = localStorage.getItem(LS_LIKE) || "";
   const dislike = localStorage.getItem(LS_DISLIKE) || "";
@@ -556,7 +559,7 @@ async function generateDinnerAI(idx) {
 }
 window.generateDinnerAI = generateDinnerAI;
 
-// ====== IA: DESAYUNO / ALMUERZO ======
+// ====== IA: DESAYUNO / ALMUERZO / CENA (botón mini dentro de cada card) ======
 async function generateMealAI(idx, mealKey, week) {
   const like = localStorage.getItem(LS_LIKE) || "";
   const dislike = localStorage.getItem(LS_DISLIKE) || "";
@@ -564,8 +567,15 @@ async function generateMealAI(idx, mealKey, week) {
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
 
-  const mealNameES = mealKey === "desayuno" ? "desayuno" : "almuerzo";
-  const mealNameEN = mealKey === "desayuno" ? "breakfast" : "lunch";
+  let mealNameES = "almuerzo";
+  let mealNameEN = "lunch";
+  if (mealKey === "desayuno") {
+    mealNameES = "desayuno";
+    mealNameEN = "breakfast";
+  } else if (mealKey === "cena") {
+    mealNameES = "cena";
+    mealNameEN = "dinner";
+  }
 
   const prompt =
     lang === "en"
@@ -589,7 +599,10 @@ async function generateMealAI(idx, mealKey, week) {
       return;
     }
     const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
-    existing[mealKey] = { nombre: text, qty: lang === "en" ? "AI " + mealNameEN : "IA " + mealNameES };
+    existing[mealKey] = {
+      nombre: text,
+      qty: lang === "en" ? "AI " + mealNameEN : "IA " + mealNameES
+    };
     localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
     renderMenuDay(idx, week);
     showToast(lang === "en" ? "AI meal updated" : "Comida IA actualizada");
@@ -667,7 +680,6 @@ async function generateFullDayAI(idx, week) {
 window.generateFullDayAI = generateFullDayAI;
 
 // ====== IA: WORKOUT DEL DÍA (FORMATO LIMPIO) ======
-// helper para sacar el JSON real
 function extractJSONSnippet(raw) {
   if (!raw) return null;
   const fence = raw.match(/```(?:json)?([\s\S]*?)```/i);
@@ -711,7 +723,6 @@ function parseWorkoutTextToClean(raw, lang) {
   })).slice(0, 6);
 }
 
-// 👇 función reutilizable para pintar desde un array (también sirve para lo guardado)
 function renderWorkoutCardsFromArray(idx, workouts, lang) {
   const box = document.getElementById("ai-workout-list-" + idx);
   if (!box) return;
@@ -744,10 +755,16 @@ async function generateWorkoutAI(idx, week) {
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
   const lang = appLang;
+  const height = localStorage.getItem(LS_HEIGHT) || "";
+  const weight = localStorage.getItem(LS_START_WEIGHT) || "";
+  const age = localStorage.getItem(LS_AGE) || "";
+  const dayNumber = idx + 1;
+  const weekNumber = Math.floor(idx / 7) + 1;
+
   const prompt =
     lang === "en"
-      ? "Return a JSON with a field 'ejercicios' that is an array of up to 5 items. Each item: {\"nombre\": short exercise name, \"series\": like \"3 x 12\" or time, \"descripcion\": very short tip}. Bodyweight only. Beginner/intermediate. English."
-      : "Devuelve un JSON con un campo 'ejercicios' que sea un array de máximo 5 ítems. Cada ítem: {\"nombre\": nombre corto del ejercicio, \"series\": por ejemplo \"3 x 12\" o tiempo, \"descripcion\": tip muy corto}. Solo peso corporal. Nivel inicial/intermedio. Español.";
+      ? `Return a JSON with field "ejercicios" for day ${dayNumber} (week ${weekNumber}) of a keto-fatloss plan. Make it a bit different from other days. Use only bodyweight. User data: height ${height} cm, weight ${weight} kg, age ${age}. Each item: {"nombre": short name, "series": like "3 x 12" or time, "descripcion": very short tip}. English.`
+      : `Devuelve un JSON con un campo "ejercicios" para el día ${dayNumber} (semana ${weekNumber}) de un plan para bajar grasa. Que no sea igual al día anterior. Solo peso corporal. Datos usuario: estatura ${height} cm, peso ${weight} kg, edad ${age}. Cada ítem: {"nombre": nombre corto, "series": "3 x 12" o tiempo, "descripcion": tip muy corto}. Español.`;
 
   try {
     const res = await fetch(GROK_PROXY, {
@@ -781,10 +798,9 @@ async function generateWorkoutAI(idx, week) {
       }
     }
 
-    // 👇 guardar en localStorage para no perderlo
+    // guardar en localStorage para no perderlo
     localStorage.setItem(LS_AI_WORKOUT + idx, JSON.stringify(workouts));
-
-    // y pintar
+    // pintar
     renderWorkoutCardsFromArray(idx, workouts, lang);
 
     showToast(lang === "en" ? "Workout generated" : "Entreno generado");
@@ -851,7 +867,7 @@ function renderCompras() {
   animateCards();
 }
 
-// ====== BODY FAT ESTIMATE ======
+// ====== BODY FAT & BMR ======
 function estimateBodyFat(heightCm, weightKg) {
   if (!heightCm || !weightKg) return null;
   const h = Number(heightCm) / 100;
@@ -864,6 +880,16 @@ function estimateBodyFat(heightCm, weightKg) {
   return bf.toFixed(1);
 }
 
+function estimateBMR(heightCm, weightKg, age, isMale = true) {
+  const h = Number(heightCm);
+  const w = Number(weightKg);
+  const a = Number(age);
+  if (!h || !w || !a) return null;
+  // Mifflin-St Jeor
+  const base = 10 * w + 6.25 * h - 5 * a + (isMale ? 5 : -161);
+  return Math.round(base);
+}
+
 // ====== PROGRESO ======
 function renderProgreso() {
   const container = document.getElementById("progreso");
@@ -871,16 +897,32 @@ function renderProgreso() {
 
   const heightSaved = localStorage.getItem(LS_HEIGHT) || "";
   const startWeightSaved = localStorage.getItem(LS_START_WEIGHT) || "";
+  const ageSaved = localStorage.getItem(LS_AGE) || "";
+
+  const hasBase = heightSaved && startWeightSaved;
 
   const baseBox = document.createElement("div");
   baseBox.className = "list-row";
   baseBox.innerHTML = `
     <strong>${appLang === "en" ? "Base data" : "Datos base"}</strong>
-    <p class="small">${appLang === "en" ? "Enter your height and initial weight to estimate body fat." : "Pon tu estatura y tu peso inicial para calcular % de grasa aproximado."}</p>
-    <input type="number" id="heightCm" placeholder="${appLang === "en" ? "Height (cm)" : "Estatura (cm)"}" value="${heightSaved}">
-    <input type="number" id="startWeight" placeholder="${appLang === "en" ? "Initial weight (kg)" : "Peso inicial (kg)"}" value="${startWeightSaved}">
-    <button class="save-btn" onclick="saveBaseProgress()">${appLang === "en" ? "Save base data" : "Guardar datos base"}</button>
-    <p class="small" id="bfInfo"></p>
+    <div id="base-form" style="${hasBase ? "display:none" : ""}">
+      <p class="small">${appLang === "en" ? "Enter your height, initial weight and age to estimate body fat and BMR." : "Pon tu estatura, tu peso inicial y edad para calcular % de grasa y TMB estimada."}</p>
+      <input type="number" id="heightCm" placeholder="${appLang === "en" ? "Height (cm)" : "Estatura (cm)"}" value="${heightSaved}">
+      <input type="number" id="startWeight" placeholder="${appLang === "en" ? "Initial weight (kg)" : "Peso inicial (kg)"}" value="${startWeightSaved}">
+      <input type="number" id="ageYears" placeholder="${appLang === "en" ? "Age (years)" : "Edad (años)"}" value="${ageSaved}">
+      <button class="save-btn" onclick="saveBaseProgress()">${appLang === "en" ? "Save base data" : "Guardar datos base"}</button>
+    </div>
+    <div id="base-view" style="${hasBase ? "" : "display:none"}">
+      <p class="small">${appLang === "en" ? "Saved info:" : "Información guardada:"}</p>
+      <div class="base-inline">
+        <span id="base-h">${appLang === "en" ? "Height" : "Estatura"}: ${heightSaved} cm</span>
+        <span id="base-w">${appLang === "en" ? "Start weight" : "Peso inicial"}: ${startWeightSaved} kg</span>
+        ${ageSaved ? `<span id="base-a">${appLang === "en" ? "Age" : "Edad"}: ${ageSaved}</span>` : ""}
+      </div>
+      <p class="small" id="bfInfo"></p>
+      <p class="small" id="bmrInfo"></p>
+      <button class="save-btn ghost" onclick="editBaseProgress()">${appLang === "en" ? "Edit" : "Editar"}</button>
+    </div>
   `;
   container.appendChild(baseBox);
 
@@ -948,18 +990,55 @@ function renderProgreso() {
   drawChart();
   drawExerciseChart();
   updateBodyFatInfo();
+  updateBmrInfo();
 }
 
 function saveBaseProgress() {
   const h = document.getElementById("heightCm").value;
   const sw = document.getElementById("startWeight").value;
+  const age = document.getElementById("ageYears").value;
   if (h) localStorage.setItem(LS_HEIGHT, h);
   if (sw) localStorage.setItem(LS_START_WEIGHT, sw);
+  if (age) localStorage.setItem(LS_AGE, age);
   showToast(appLang === "en" ? "Base data saved" : "Datos base guardados");
+
+  const form = document.getElementById("base-form");
+  const view = document.getElementById("base-view");
+  if (form && view && h && sw) {
+    form.style.display = "none";
+    view.style.display = "block";
+    document.getElementById("base-h").textContent = (appLang === "en" ? "Height" : "Estatura") + ": " + h + " cm";
+    document.getElementById("base-w").textContent = (appLang === "en" ? "Start weight" : "Peso inicial") + ": " + sw + " kg";
+    if (age) {
+      const existingAgeSpan = document.getElementById("base-a");
+      if (existingAgeSpan) {
+        existingAgeSpan.textContent = (appLang === "en" ? "Age" : "Edad") + ": " + age;
+      } else {
+        const span = document.createElement("span");
+        span.id = "base-a";
+        span.textContent = (appLang === "en" ? "Age" : "Edad") + ": " + age;
+        view.querySelector(".base-inline").appendChild(span);
+      }
+    }
+  }
+
   updateBodyFatInfo();
+  updateBmrInfo();
   drawChart();
   drawExerciseChart();
 }
+window.saveBaseProgress = saveBaseProgress;
+
+function editBaseProgress() {
+  const form = document.getElementById("base-form");
+  const view = document.getElementById("base-view");
+  if (form && view) {
+    form.style.display = "block";
+    view.style.display = "none";
+  }
+}
+window.editBaseProgress = editBaseProgress;
+
 function updateBodyFatInfo() {
   const el = document.getElementById("bfInfo");
   if (!el) return;
@@ -977,6 +1056,23 @@ function updateBodyFatInfo() {
     el.textContent = "";
   }
 }
+
+function updateBmrInfo() {
+  const el = document.getElementById("bmrInfo");
+  if (!el) return;
+  const h = localStorage.getItem(LS_HEIGHT);
+  const w = localStorage.getItem(LS_START_WEIGHT);
+  const age = localStorage.getItem(LS_AGE);
+  if (h && w && age) {
+    const bmr = estimateBMR(h, w, age, true);
+    el.textContent = (appLang === "en"
+      ? "Estimated BMR (maintenance): "
+      : "TMB estimada (mantenimiento): ") + bmr + " kcal/día";
+  } else {
+    el.textContent = "";
+  }
+}
+
 function shareProgress() {
   const name = localStorage.getItem(LS_NAME) || (appLang === "en" ? "My keto progress" : "Mi progreso Keto");
   const done = getCompletedCount();
