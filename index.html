@@ -128,6 +128,14 @@
     </div>
 
     <div class="list-row">
+      <strong>Acceso API seguro</strong>
+      <p class="small">Define usuario y clave. Se enviará con las llamadas a Netlify para usar tu API de OpenAI.</p>
+      <input id="apiUser" placeholder="Usuario">
+      <input id="apiPass" placeholder="Clave / Token">
+      <button class="save-btn" onclick="saveApiAccess()">Guardar acceso</button>
+    </div>
+
+    <div class="list-row">
       <strong>Reiniciar todo</strong>
       <p class="small">Borra progreso, nombre, fecha y días completados.</p>
       <button class="save-btn danger" onclick="resetAll()">Borrar todo</button>

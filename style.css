@@ -360,6 +360,40 @@ input:checked + .ball::after {
   opacity: .7;
 }
 
+/* CALORIE BAR */
+.calorie-bar {
+  background: rgba(15,23,42,.18);
+  border: 1px solid rgba(148,163,184,.1);
+  border-radius: .55rem;
+  padding: .35rem .5rem .4rem;
+  margin-bottom: .5rem;
+}
+[data-theme="light"] .calorie-bar {
+  background: rgba(255,255,255,.6);
+}
+.calorie-head {
+  font-size: .63rem;
+  margin-bottom: .35rem;
+  display: flex;
+  gap: .35rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.calorie-line {
+  width: 100%;
+  height: 6px;
+  background: rgba(148,163,184,.2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.calorie-line span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), #f97316);
+  border-radius: inherit;
+  transition: width .25s ease;
+}
+
 /* MACROS */
 .macros {
   display: flex;
@@ -394,6 +428,11 @@ input:checked + .ball::after {
   border-radius: .6rem;
   padding: .55rem .55rem .4rem;
   font-size: .68rem;
+  transition: background .2s ease, border .2s ease;
+}
+.meal-done {
+  background: rgba(34,197,94,.1);
+  border-color: rgba(34,197,94,.45);
 }
 [data-theme="light"] .meal {
   background: rgba(255,255,255,.4);
@@ -404,11 +443,25 @@ input:checked + .ball::after {
   gap: .4rem;
   margin-bottom: .15rem;
   font-weight: 600;
+  align-items: center;
 }
 .meal-qty {
   font-size: .58rem;
   opacity: .6;
   text-align: right;
+}
+
+/* WORKOUT BOX */
+.workout-box {
+  background: rgba(15,23,42,.14);
+  border: 1px solid rgba(148,163,184,.08);
+  border-radius: .6rem;
+  padding: .4rem .5rem .4rem;
+  font-size: .65rem;
+  margin-top: .5rem;
+}
+.workout-box .small {
+  margin-bottom: .25rem;
 }
 
 /* ACTIONS */
@@ -444,6 +497,22 @@ input:checked + .ball::after {
 }
 .ia-btn {
   background: rgba(14,165,233,.4);
+}
+
+/* CAL BUTTON */
+.cal-btn {
+  border: none;
+  background: rgba(15,118,110,.18);
+  color: #fff;
+  font-size: .55rem;
+  padding: .15rem .4rem .2rem;
+  border-radius: .4rem;
+  cursor: pointer;
+  margin-right: .4rem;
+  flex-shrink: 0;
+}
+[data-theme="light"] .cal-btn {
+  background: rgba(15,118,110,.35);
 }
 
 /* LIST ROW */
@@ -496,7 +565,6 @@ input[type="date"] {
   background-color: rgba(255,255,255,.03);
 }
 @supports (-webkit-touch-callout: none) {
-  /* iPhone/Safari: súbele un poquito el font-size para que no haga zoom raro */
   input[type="date"] {
     font-size: .78rem;
   }

@@ -11,8 +11,12 @@ const LS_START_WEIGHT = LS_PREFIX + "start-weight";
 const LS_LANG = LS_PREFIX + "lang";
 const LS_LIKE = LS_PREFIX + "like-foods";
 const LS_DISLIKE = LS_PREFIX + "dislike-foods";
+const LS_API_USER = LS_PREFIX + "api-user";
+const LS_API_PASS = LS_PREFIX + "api-pass";
+const LS_AI_DAY_PREFIX = LS_PREFIX + "ai-day-";
+const LS_CAL_PREFIX = LS_PREFIX + "cal-";
 
-// 👇 ahora usamos el proxy de Netlify hacia Grok
+// 👇 ahora usamos el proxy de Netlify hacia (ahora) OpenAI/Grok
 const GROK_PROXY = "/.netlify/functions/grok";
 
 let weightChart = null;
@@ -85,15 +89,69 @@ const tipsEN = [
   "🧴 You can swap butter for olive oil."
 ];
 
-// ====== EJERCICIOS POR SEMANA ======
-function getExercisesForWeek(week) {
-  const all = {
-    1: ["Caminar 30 min 4 veces", "2 sesiones de movilidad de cadera", "Planchas 3 x 30 seg"],
-    2: ["Caminar 35 min 4 veces", "1 día de fuerza pierna peso corporal", "Abdominales 3 x 15"],
-    3: ["Caminar rápido 30 min 5 veces", "Fuerza torso (lagartijas apoyadas)", "Estiramientos 10 min"],
-    4: ["Caminar 40 min 4 veces", "Fuerza completa 2 días", "Respiración profunda 5 min"]
+// ====== WORKOUTS LOCALIZADOS POR SEMANA Y DÍA ======
+const localizedWorkouts = {
+  1: {
+    focusES: "Base de movilidad + caminar",
+    focusEN: "Mobility + walking base",
+    days: [
+      "Caminar 30 min ritmo cómodo",
+      "Movilidad cadera + hombros 12 min",
+      "Descanso activo: 15 min estiramientos",
+      "Caminar 30 min + plancha 3 x 30 s",
+      "Fuerza peso corporal (sentadillas, push-ups apoyadas) 20 min",
+      "Caminar 25-30 min",
+      "Respiración profunda 5 min + estiramientos"
+    ]
+  },
+  2: {
+    focusES: "Más cardio y fuerza ligera",
+    focusEN: "More cardio and light strength",
+    days: [
+      "Caminar 35 min",
+      "Pierna peso corporal 20 min",
+      "Caminar 20 min + core 3 x 15",
+      "Caminar 35 min",
+      "Torso: push-ups apoyadas, remo con banda 20 min",
+      "Movilidad 10 min",
+      "Descanso activo 15 min"
+    ]
+  },
+  3: {
+    focusES: "Frecuencia alta y core",
+    focusEN: "Higher frequency + core",
+    days: [
+      "Caminar rápido 30 min",
+      "Core: planchas + hollow 15 min",
+      "Fuerza full body ligera",
+      "Caminar 30-35 min",
+      "Subir escaleras 10-12 min",
+      "Movilidad 10 min",
+      "Descanso activo"
+    ]
+  },
+  4: {
+    focusES: "Consolidación y fuerza completa",
+    focusEN: "Consolidation + full strength",
+    days: [
+      "Caminar 40 min",
+      "Fuerza completa 25 min",
+      "Core + movilidad 15 min",
+      "Caminar 35 min",
+      "Fuerza tren inferior 20 min",
+      "Caminar 25 min",
+      "Respiración + estiramientos 10 min"
+    ]
+  }
+};
+
+function getWorkoutForDay(week, dayIndex) {
+  const w = localizedWorkouts[week] || localizedWorkouts[1];
+  const today = w.days[dayIndex] || w.days[0];
+  return {
+    focus: appLang === "en" ? w.focusEN : w.focusES,
+    today
   };
-  return all[week] || all[1];
 }
 
 // ====== BUILD PLAN SEGÚN SEMANAS ======
@@ -235,15 +293,84 @@ function updateProgressBar() {
   document.getElementById("progressBar").style.width = (count / derivedPlan.length * 100) + "%";
 }
 
+// ====== CALORÍAS POR DÍA ======
+function getCalorieState(idx, day) {
+  const stored = localStorage.getItem(LS_CAL_PREFIX + idx);
+  const baseGoal = day.kcal || 1600;
+  if (stored) {
+    const parsed = JSON.parse(stored);
+    // aseguramos que tenga goal
+    parsed.goal = parsed.goal || baseGoal;
+    return parsed;
+  }
+  return {
+    goal: baseGoal,
+    // estimación: desayuno 25%, snackAM 10%, almuerzo 35%, snackPM 10%, cena 20%
+    meals: {
+      desayuno: false,
+      snackAM: false,
+      almuerzo: false,
+      snackPM: false,
+      cena: false
+    }
+  };
+}
+function saveCalorieState(idx, state) {
+  localStorage.setItem(LS_CAL_PREFIX + idx, JSON.stringify(state));
+}
+function calcConsumedFromState(state, day) {
+  const goal = state.goal || day.kcal || 1600;
+  const mealPercents = {
+    desayuno: 0.25,
+    snackAM: 0.1,
+    almuerzo: 0.35,
+    snackPM: 0.1,
+    cena: 0.2
+  };
+  let consumed = 0;
+  Object.keys(state.meals).forEach(meal => {
+    if (state.meals[meal]) {
+      consumed += Math.round(goal * mealPercents[meal]);
+    }
+  });
+  return {consumed, goal};
+}
+function toggleMealCal(idx, mealKey, week) {
+  const day = derivedPlan[idx];
+  const state = getCalorieState(idx, day);
+  state.meals[mealKey] = !state.meals[mealKey];
+  saveCalorieState(idx, state);
+  renderMenuDay(idx, week);
+}
+window.toggleMealCal = toggleMealCal;
+
 // ====== MENÚ DÍA ======
 function renderMenuDay(idx, week) {
   const menuDays = document.getElementById("menuDays");
   menuDays.innerHTML = "";
-  const day = derivedPlan[idx];
+  let day = derivedPlan[idx];
+
+  // si hay un día IA guardado, lo usamos
+  const aiStored = localStorage.getItem(LS_AI_DAY_PREFIX + idx);
+  if (aiStored) {
+    try {
+      const parsed = JSON.parse(aiStored);
+      day = Object.assign({}, day, parsed);
+    } catch(e) {}
+  }
+
   const done = localStorage.getItem(LS_PREFIX + "done-" + idx) === "1";
   const card = document.createElement("div");
   card.className = "day-card";
-  const exercises = getExercisesForWeek(week);
+
+  const dayIndexInWeek = (idx % 7);
+  const workout = getWorkoutForDay(week, dayIndexInWeek);
+
+  // calorías
+  const calState = getCalorieState(idx, day);
+  const calCalc = calcConsumedFromState(calState, day);
+  const calPercent = Math.min(100, Math.round((calCalc.consumed / calCalc.goal) * 100));
+
   card.innerHTML = `
     <div class="day-title">
       <h2>${day.dia}</h2>
@@ -254,36 +381,68 @@ function renderMenuDay(idx, week) {
       <div class="macro">${appLang === "en" ? "Protein" : "Prote"} ${day.macros.prot}</div>
       <div class="macro">${appLang === "en" ? "Fat" : "Grasa"} ${day.macros.fat}</div>
     </div>
+    <div class="calorie-bar">
+      <div class="calorie-head">
+        ${appLang === "en" ? "Calories today" : "Calorías hoy"}:
+        <strong id="cal-val-${idx}">${calCalc.consumed}</strong>/<span>${calCalc.goal}</span> kcal
+      </div>
+      <div class="calorie-line">
+        <span style="width:${calPercent}%" id="cal-bar-${idx}"></span>
+      </div>
+    </div>
     <div class="food-grid">
-      <div class="meal">
-        <div class="meal-title"><span>🍳 ${appLang === "en" ? "Breakfast" : "Desayuno"}</span><span class="meal-qty">${day.desayuno.qty}</span></div>
+      <div class="meal ${calState.meals.desayuno ? "meal-done" : ""}">
+        <div class="meal-title">
+          <span>🍳 ${appLang === "en" ? "Breakfast" : "Desayuno"}</span>
+          <button class="cal-btn" onclick="toggleMealCal(${idx}, 'desayuno', ${week})">${calState.meals.desayuno ? "✓" : "+"}</button>
+          <span class="meal-qty">${day.desayuno.qty}</span>
+        </div>
         <div id="desayuno-text">${day.desayuno.nombre}</div>
       </div>
-      <div class="meal">
-        <div class="meal-title"><span>⏰ ${appLang === "en" ? "Snack AM" : "Snack AM"}</span><span class="meal-qty">${day.snackAM.qty}</span></div>
+      <div class="meal ${calState.meals.snackAM ? "meal-done" : ""}">
+        <div class="meal-title">
+          <span>⏰ ${appLang === "en" ? "Snack AM" : "Snack AM"}</span>
+          <button class="cal-btn" onclick="toggleMealCal(${idx}, 'snackAM', ${week})">${calState.meals.snackAM ? "✓" : "+"}</button>
+          <span class="meal-qty">${day.snackAM.qty}</span>
+        </div>
         <div id="snackam-text">${day.snackAM.nombre}</div>
       </div>
-      <div class="meal">
-        <div class="meal-title"><span>🥗 ${appLang === "en" ? "Lunch" : "Almuerzo"}</span><span class="meal-qty">${day.almuerzo.qty}</span></div>
+      <div class="meal ${calState.meals.almuerzo ? "meal-done" : ""}">
+        <div class="meal-title">
+          <span>🥗 ${appLang === "en" ? "Lunch" : "Almuerzo"}</span>
+          <button class="cal-btn" onclick="toggleMealCal(${idx}, 'almuerzo', ${week})">${calState.meals.almuerzo ? "✓" : "+"}</button>
+          <span class="meal-qty">${day.almuerzo.qty}</span>
+        </div>
         <div id="almuerzo-text">${day.almuerzo.nombre}</div>
       </div>
-      <div class="meal">
-        <div class="meal-title"><span>🥜 ${appLang === "en" ? "Snack PM" : "Snack PM"}</span><span class="meal-qty">${day.snackPM.qty}</span></div>
+      <div class="meal ${calState.meals.snackPM ? "meal-done" : ""}">
+        <div class="meal-title">
+          <span>🥜 ${appLang === "en" ? "Snack PM" : "Snack PM"}</span>
+          <button class="cal-btn" onclick="toggleMealCal(${idx}, 'snackPM', ${week})">${calState.meals.snackPM ? "✓" : "+"}</button>
+          <span class="meal-qty">${day.snackPM.qty}</span>
+        </div>
         <div id="snackpm-text">${day.snackPM.nombre}</div>
       </div>
-      <div class="meal" id="cena-block">
-        <div class="meal-title"><span>🍖 ${appLang === "en" ? "Dinner" : "Cena"}</span><span class="meal-qty" id="cena-qty">${day.cena.qty}</span></div>
+      <div class="meal ${calState.meals.cena ? "meal-done" : ""}" id="cena-block">
+        <div class="meal-title">
+          <span>🍖 ${appLang === "en" ? "Dinner" : "Cena"}</span>
+          <button class="cal-btn" onclick="toggleMealCal(${idx}, 'cena', ${week})">${calState.meals.cena ? "✓" : "+"}</button>
+          <span class="meal-qty" id="cena-qty">${day.cena.qty}</span>
+        </div>
         <div id="cena-text">${day.cena.nombre}</div>
       </div>
     </div>
-    <div class="list-row" style="margin-top:.5rem">
-      <strong>${appLang === "en" ? "Suggested exercises week" : "Ejercicios sugeridos semana"} ${week}</strong>
-      <div class="small">${exercises.map(e => "• " + e).join("<br>")}</div>
+    <div class="workout-box">
+      <strong>${appLang === "en" ? "Weekly focus" : "Foco semanal"}:</strong>
+      <p class="small">${workout.focus}</p>
+      <strong>${appLang === "en" ? "Today's training" : "Entrenamiento de hoy"}:</strong>
+      <p class="small">${workout.today}</p>
     </div>
     <div class="day-actions">
       <button class="done-btn ${done ? "done" : ""}" onclick="toggleDone(${idx}, ${week})">${done ? (appLang === "en" ? "✔ Day completed" : "✔ Día completado") : (appLang === "en" ? "Mark day ✔" : "Marcar día ✔")}</button>
       <button class="swap-btn" onclick="swapCena(${idx}, ${week})">${appLang === "en" ? "Change dinner 🔁" : "Cambiar cena 🔁"}</button>
       <button class="ia-btn" onclick="generateDinnerAI(${idx})">${appLang === "en" ? "Dinner AI 🤖" : "Cena IA 🤖"}</button>
+      <button class="ia-btn" onclick="generateFullDayAI(${idx}, ${week})">${appLang === "en" ? "Full day AI 📅" : "Día completo IA 📅"}</button>
     </div>
   `;
   menuDays.appendChild(card);
@@ -317,37 +476,13 @@ function swapCena(idx, week) {
 }
 window.swapCena = swapCena;
 
-// ====== IA: PARSEAR RESPUESTA DE GROK ======
-function extractGrokText(resp) {
-  if (!resp) return "";
-  // si la función de Netlify nos envía {success:true, data:{...}}
-  if (resp.data) {
-    const d = resp.data;
-    // algunas respuestas de xAI traen output_text directo
-    if (d.output_text) return d.output_text;
-    // otras traen "output" como array
-    if (Array.isArray(d.output) && d.output.length > 0) {
-      const first = d.output[0];
-      if (first && Array.isArray(first.content)) {
-        const textPart = first.content.find(c => c.type === "output_text" || c.type === "text");
-        if (textPart && textPart.text) return textPart.text;
-      }
-    }
-    // estilo openai-like: choices[0].message.content
-    if (Array.isArray(d.choices) && d.choices[0]?.message?.content) {
-      return d.choices[0].message.content;
-    }
-  }
-  // si vino directo text
-  if (resp.text) return resp.text;
-  return "";
-}
-
-// ====== IA: GENERAR CENA CON GROK ======
+// ====== IA: DINNER ======
 async function generateDinnerAI(idx) {
   const like = localStorage.getItem(LS_LIKE) || "";
   const dislike = localStorage.getItem(LS_DISLIKE) || "";
   const lang = appLang;
+  const apiUser = localStorage.getItem(LS_API_USER) || "";
+  const apiPass = localStorage.getItem(LS_API_PASS) || "";
 
   const prompt =
     lang === "en"
@@ -355,10 +490,10 @@ async function generateDinnerAI(idx) {
       : `Crea 1 cena keto (corta) de unas 500-650 kcal. Evita: ${dislike}. Prefiere: ${like}. Responde SOLO con: Título, Ingredientes, Preparación.`;
 
   try {
-    const res = await fetch("/.netlify/functions/grok", {
+    const res = await fetch(GROK_PROXY, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify({ prompt, user: apiUser, pass: apiPass, mode: "dinner", lang })
     });
 
     const data = await res.json();
@@ -382,10 +517,70 @@ async function generateDinnerAI(idx) {
     showToast(lang === "en" ? "AI dinner updated" : "Cena IA actualizada");
   } catch (e) {
     console.error(e);
-    showToast(lang === "en" ? "Error calling AI" : "Error llamando a la IA");
+    showToast(appLang === "en" ? "Error calling AI" : "Error llamando a la IA");
   }
 }
 window.generateDinnerAI = generateDinnerAI;
+
+// ====== IA: DÍA COMPLETO ======
+async function generateFullDayAI(idx, week) {
+  const name = localStorage.getItem(LS_NAME) || "";
+  const like = localStorage.getItem(LS_LIKE) || "";
+  const dislike = localStorage.getItem(LS_DISLIKE) || "";
+  const lang = appLang;
+  const apiUser = localStorage.getItem(LS_API_USER) || "";
+  const apiPass = localStorage.getItem(LS_API_PASS) || "";
+  const baseDay = derivedPlan[idx];
+
+  const payload = {
+    mode: "full-day",
+    lang,
+    user: apiUser,
+    pass: apiPass,
+    kcal: baseDay.kcal,
+    prefs: { like, dislike },
+    dayIndex: idx + 1,
+    username: name
+  };
+
+  try {
+    const res = await fetch(GROK_PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      showToast(data.error || (lang === "en" ? "AI error" : "Error de IA"));
+      return;
+    }
+
+    // intentamos parsear contenido estructurado
+    let structured = null;
+    if (data.structured) {
+      structured = data.structured;
+    } else if (data.text) {
+      try {
+        structured = JSON.parse(data.text);
+      } catch(e) {
+        // si no vino JSON, lo guardamos como cena de IA para no perderlo
+      }
+    }
+
+    if (structured && structured.desayuno && structured.almuerzo && structured.cena) {
+      // lo guardamos para este día
+      localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(structured));
+      showToast(lang === "en" ? "Full AI day applied" : "Día IA aplicado");
+      renderMenuDay(idx, week);
+    } else {
+      showToast(lang === "en" ? "AI answered but was not structured" : "La IA respondió pero no en formato estructurado");
+    }
+  } catch (e) {
+    console.error(e);
+    showToast(lang === "en" ? "Error calling AI" : "Error llamando a la IA");
+  }
+}
+window.generateFullDayAI = generateFullDayAI;
 
 // ====== COMPRAS ======
 function renderCompras() {
@@ -657,6 +852,8 @@ function switchTab(target) {
     document.getElementById("appLang").value = appLang;
     document.getElementById("likeFoods").value = localStorage.getItem(LS_LIKE) || "";
     document.getElementById("dislikeFoods").value = localStorage.getItem(LS_DISLIKE) || "";
+    document.getElementById("apiUser").value = localStorage.getItem(LS_API_USER) || "";
+    document.getElementById("apiPass").value = localStorage.getItem(LS_API_PASS) || "";
   }
 }
 
@@ -760,6 +957,15 @@ function saveFoodPrefs() {
   showToast(appLang === "en" ? "Food preferences saved" : "Preferencias guardadas");
 }
 window.saveFoodPrefs = saveFoodPrefs;
+
+function saveApiAccess() {
+  const u = document.getElementById("apiUser").value.trim();
+  const p = document.getElementById("apiPass").value.trim();
+  localStorage.setItem(LS_API_USER, u);
+  localStorage.setItem(LS_API_PASS, p);
+  showToast(appLang === "en" ? "API access saved" : "Acceso API guardado");
+}
+window.saveApiAccess = saveApiAccess;
 
 // ====== ANIMACIONES ======
 function animateCards() {
