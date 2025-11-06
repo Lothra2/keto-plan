@@ -75,7 +75,7 @@
         </div>
       </div>
 
-      <!-- Motivación -->
+      <!-- Motivación general (sigue existiendo, pero el mensaje del día va en la card) -->
       <div
         id="motivation"
         class="motivation-box"
@@ -180,6 +180,24 @@
           <option value="#f97316">Naranja</option>
           <option value="#0ea5e9">Cian</option>
         </select>
+      </div>
+
+      <!-- Agua diaria -->
+      <div class="list-row">
+        <strong>Agua diaria</strong>
+        <p class="small">
+          Define tu meta de agua por día (en ml). Se usa en cada día del plan.
+        </p>
+        <input
+          id="waterGoalInput"
+          type="number"
+          placeholder="Ej. 2400"
+          min="1000"
+          step="100"
+        />
+        <button class="save-btn" onclick="saveWaterGoal()">
+          Guardar meta de agua
+        </button>
       </div>
 
       <!-- Preferencias IA -->

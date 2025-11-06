@@ -20,6 +20,12 @@ const LS_CAL_PREFIX = LS_PREFIX + "cal-";
 const LS_PROGRESS_PREFIX = LS_PREFIX + "prog-";
 const LS_SELECTED_DAY = LS_PREFIX + "sel-day";
 const LS_SELECTED_WEEK = LS_PREFIX + "sel-week";
+// agua
+const LS_WATER_PREFIX = LS_PREFIX + "water-";
+const LS_WATER_GOAL = LS_PREFIX + "water-goal";
+
+// gamificación básica
+const LS_BADGE_PREFIX = LS_PREFIX + "badge-";
 
 const GROK_PROXY = "/.netlify/functions/grok";
 
@@ -69,12 +75,6 @@ const basePlan = [
   {dia:"Día 14",kcal:1600,macros:{carbs:"7%",prot:"24%",fat:"69%"},desayuno:{nombre:"Omelette feta y rocket",qty:"2-3 huevos, 30 g feta, 30 g rocket"},snackAM:{nombre:"Yogur con chía",qty:"120 g yogur, 5 g chía"},almuerzo:{nombre:"Pollo con aguacate y tomate",qty:"140 g pollo, 1/2 aguacate, 40 g tomate"},snackPM:{nombre:"Marañones o feta",qty:"20 g marañones o 25 g feta"},cena:{nombre:"Filete de res con brócoli y mantequilla",qty:"160 g res, 100 g brócoli, 5 g mantequilla"}}
 ];
 
-const cenaSwaps = [
-  {nombre:"Pollo 150 g con brócoli 120 g y mantequilla 5 g",qty:"150 g pollo, 120 g brócoli, 5 g mantequilla"},
-  {nombre:"Hamburguesa sin pan con queso y ensalada",qty:"150 g carne, 20 g queso, ensalada verde"},
-  {nombre:"Salmón 140 g con ensalada verde",qty:"140 g salmón, 50 g hojas verdes"}
-];
-
 const tipsES = [
   "🥤 Toma agua con un poco de sal.",
   "🥑 Si tienes hambre sube grasa.",
@@ -88,6 +88,40 @@ const tipsEN = [
   "🍳 Two extra eggs are fine.",
   "📸 Take a picture on day 1 and last day.",
   "🧴 You can swap butter for olive oil."
+];
+
+// frases motivacionales por día
+const motivationalES = [
+  "Vas un día a la vez. Manténlo simple.",
+  "Tu yo de mañana te va a agradecer esto.",
+  "No tiene que ser perfecto, solo consistente.",
+  "Comiste bien, ahora hidrátate 💧.",
+  "Moverte 20 min hoy ya es ganancia.",
+  "Esto ya parece rutina, sigue así.",
+  "Casi cierras la semana 👏.",
+  "Nueva semana, mismas metas.",
+  "Tu cuerpo ya está respondiendo.",
+  "No subestimes los snacks limpios.",
+  "Buen ritmo, no lo sueltes.",
+  "Tómate 5 min de estiramientos.",
+  "Ya casi terminas el plan.",
+  "Cierra con foto y peso 😉"
+];
+const motivationalEN = [
+  "One day at a time. Keep it simple.",
+  "Your future you will love this.",
+  "It doesn’t need to be perfect, just consistent.",
+  "You ate clean, now hydrate 💧.",
+  "Move 20 min today, that’s enough.",
+  "This is becoming a routine.",
+  "Almost closing the week 👏.",
+  "New week, same goals.",
+  "Your body is responding already.",
+  "Clean snacks matter.",
+  "Nice pace, keep it.",
+  "Take 5 min for stretches.",
+  "You’re close to the finish.",
+  "Close with photo and weight 😉"
 ];
 
 // tips locales para no gastar IA
@@ -183,7 +217,7 @@ function setRandomTip(name) {
   tipBox.textContent = name ? base + " " + name + "." : base;
 }
 
-// ====== MOTIVACIÓN ======
+// ====== MOTIVACIÓN GLOBAL (sigue existiendo) ======
 function showMotivation() {
   const box = document.getElementById("motivation");
   const done = getCompletedCount();
@@ -354,6 +388,46 @@ function toggleMealCal(idx, mealKey, week) {
 }
 window.toggleMealCal = toggleMealCal;
 
+// ====== AGUA POR DÍA ======
+function getDailyWaterGoal() {
+  const saved = Number(localStorage.getItem(LS_WATER_GOAL));
+  return saved && saved > 0 ? saved : 2400; // ml por defecto
+}
+function getWaterState(idx) {
+  const stored = localStorage.getItem(LS_WATER_PREFIX + idx);
+  const goal = getDailyWaterGoal();
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      return {
+        goal: parsed.goal || goal,
+        ml: parsed.ml || 0
+      };
+    } catch(e) {}
+  }
+  return {
+    goal,
+    ml: 0
+  };
+}
+function saveWaterState(idx, state) {
+  localStorage.setItem(LS_WATER_PREFIX + idx, JSON.stringify(state));
+}
+function addWater(idx, week, amount) {
+  const dayWater = getWaterState(idx);
+  dayWater.ml = Math.max(0, dayWater.ml + amount);
+  saveWaterState(idx, dayWater);
+  renderMenuDay(idx, week);
+}
+window.addWater = addWater;
+function resetWater(idx, week) {
+  const dayWater = getWaterState(idx);
+  dayWater.ml = 0;
+  saveWaterState(idx, dayWater);
+  renderMenuDay(idx, week);
+}
+window.resetWater = resetWater;
+
 // ====== OBTENER DÍA CON IA MERGEADO ======
 function getDayWithAI(idx) {
   let day = derivedPlan[idx];
@@ -387,7 +461,6 @@ function computeDynamicMacros(day, calState) {
 // ====== EXTRAS IA POR DÍA ======
 function extractIngredientsFromQty(qty) {
   if (!qty) return [];
-  // separar por coma o •
   return qty
     .split(/,|•/g)
     .map(t => t.trim())
@@ -427,6 +500,12 @@ function renderAIExtras(idx) {
   `;
 }
 
+// ====== MENSAJE MOTIVACIONAL POR DÍA ======
+function getDailyMotivation(idx) {
+  const source = appLang === "en" ? motivationalEN : motivationalES;
+  return source[idx % source.length];
+}
+
 // ====== MENÚ DÍA ======
 function renderMenuDay(idx, week) {
   // recordar selección
@@ -448,10 +527,17 @@ function renderMenuDay(idx, week) {
   const calPercent = Math.min(100, Math.round((calCalc.consumed / calCalc.goal) * 100));
   const dynMacros = computeDynamicMacros(day, calState);
 
+  const water = getWaterState(idx);
+  const waterPercent = Math.min(100, Math.round((water.ml / water.goal) * 100));
+  const motivationText = getDailyMotivation(idx);
+
   card.innerHTML = `
     <div class="day-title">
       <h2>${day.dia}</h2>
       <div class="kcal">${day.kcal || 1600} kcal</div>
+    </div>
+    <div class="day-motivation">
+      ${motivationText}
     </div>
     <div class="macros">
       <div class="macro">Carbs ${dynMacros.carbs}</div>
@@ -465,6 +551,20 @@ function renderMenuDay(idx, week) {
       </div>
       <div class="calorie-line">
         <span style="width:${calPercent}%" id="cal-bar-${idx}"></span>
+      </div>
+    </div>
+    <div class="hydration-box">
+      <div class="hydration-head">
+        💧 ${appLang === "en" ? "Water today" : "Agua de hoy"}
+        <span>${water.ml} / ${water.goal} ml</span>
+      </div>
+      <div class="hydration-line">
+        <span style="width:${waterPercent}%"></span>
+      </div>
+      <div class="hydration-actions">
+        <button onclick="addWater(${idx}, ${week}, 250)">+250ml</button>
+        <button onclick="addWater(${idx}, ${week}, 500)">+500ml</button>
+        <button class="ghost" onclick="resetWater(${idx}, ${week})">${appLang === "en" ? "Reset" : "Reiniciar"}</button>
       </div>
     </div>
     <div class="food-grid">
@@ -483,6 +583,7 @@ function renderMenuDay(idx, week) {
       <button class="ia-btn small-btn" onclick="generateWorkoutAI(${idx}, ${week})">${appLang === "en" ? "Workout AI 🏋️" : "Entreno IA 🏋️"}</button>
       <div class="ai-workout-list" id="ai-workout-list-${idx}" style="display:none"></div>
     </div>
+    <div class="ai-review-box" id="ai-review-${idx}" style="display:none"></div>
     <div class="day-actions">
       <button class="done-btn ${done ? "done" : ""}" onclick="toggleDone(${idx}, ${week})">
         ${done ? (appLang === "en" ? "✔ Day completed" : "✔ Día completado") : (appLang === "en" ? "Mark day ✔" : "Marcar día ✔")}
@@ -491,7 +592,7 @@ function renderMenuDay(idx, week) {
         ${appLang === "en" ? "Full day AI 📅" : "Día completo IA 📅"}
       </button>
       <button class="ia-btn ghost-btn" onclick="reviewDayWithAI(${idx}, ${week})">
-        ${appLang === "en" ? "Review IA" : "Revisar IA"}
+        ${appLang === "en" ? "Analyze AI plan 💬" : "Analizar plan IA 💬"}
       </button>
     </div>
   `;
@@ -551,19 +652,6 @@ function toggleDone(idx, week) {
 }
 window.toggleDone = toggleDone;
 
-// ====== LIMPIAR TEXTO CENA IA ======
-function cleanAiDinnerText(raw) {
-  if (!raw) return "";
-  let text = raw.trim();
-  text = text.replace(/\*\*/g, "");
-  text = text.replace(/^\s*T[ií]tulo:\s*/i, "");
-  if (text.length > 180) {
-    const firstLine = text.split("\n").find(l => l.trim().length > 0) || text;
-    text = firstLine.trim();
-  }
-  return text;
-}
-
 // ====== ANALIZADOR RÁPIDO DE COMIDA IA ======
 function analyzeAIMeal(text) {
   if (!text) return null;
@@ -582,7 +670,7 @@ function analyzeAIMeal(text) {
   return notes.join(" ");
 }
 
-// ====== IA: DESAYUNO / ALMUERZO / CENA (botón mini dentro de cada card) ======
+// ====== IA: DESAYUNO / ALMUERZO / CENA ======
 async function generateMealAI(idx, mealKey, week) {
   const like = localStorage.getItem(LS_LIKE) || "";
   const dislike = localStorage.getItem(LS_DISLIKE) || "";
@@ -590,7 +678,6 @@ async function generateMealAI(idx, mealKey, week) {
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
 
-  // tip local para no gastar IA si no hay preferencias
   if (!like && !dislike) {
     const tip = localSmartTips[mealKey];
     if (tip) {
@@ -713,7 +800,7 @@ async function generateFullDayAI(idx, week) {
 }
 window.generateFullDayAI = generateFullDayAI;
 
-// ====== IA: REVISAR DÍA SIN REEMPLAZAR ======
+// ====== IA: REVISAR DÍA SIN REEMPLAZAR (ahora en la card) ======
 async function reviewDayWithAI(idx, week) {
   const lang = appLang;
   const apiUser = localStorage.getItem(LS_API_USER) || "";
@@ -736,9 +823,16 @@ async function reviewDayWithAI(idx, week) {
       showToast(data.error || (lang === "en" ? "AI did not respond" : "IA no respondió"));
       return;
     }
-    // mostramos en el tipBox para visibilidad
-    const tipBox = document.getElementById("tipBox");
-    tipBox.textContent = (data.text || "").replace(/\*/g, "").trim();
+
+    const reviewBox = document.getElementById("ai-review-" + idx);
+    if (reviewBox) {
+      const clean = (data.text || "").replace(/\*/g, "").trim();
+      reviewBox.innerHTML = `
+        <div class="ai-review-title">${lang === "en" ? "AI review of your day" : "Revisión IA de tu día"}</div>
+        <p class="small">${clean}</p>
+      `;
+      reviewBox.style.display = "block";
+    }
     showToast(lang === "en" ? "Day reviewed" : "Día revisado");
   } catch (e) {
     console.error(e);
@@ -747,7 +841,7 @@ async function reviewDayWithAI(idx, week) {
 }
 window.reviewDayWithAI = reviewDayWithAI;
 
-// ====== IA: WORKOUT DEL DÍA (FORMATO LIMPIO) ======
+// ====== WORKOUT IA ====== (igual que antes, solo reorganizado)
 function extractJSONSnippet(raw) {
   if (!raw) return null;
   const fence = raw.match(/```(?:json)?([\s\S]*?)```/i);
@@ -921,7 +1015,6 @@ function renderCompras() {
     container.appendChild(row);
   });
 
-  // extras IA agrupados pero SÓLO como referencia
   const aiExtras = [];
   for (let idx = 0; idx < derivedPlan.length; idx++) {
     const aiDay = localStorage.getItem(LS_AI_DAY_PREFIX + idx);
@@ -960,7 +1053,6 @@ function estimateBodyFat(heightCm, weightKg) {
   if (bf > 50) bf = 50;
   return bf.toFixed(1);
 }
-
 function estimateBMR(heightCm, weightKg, age, isMale = true) {
   const h = Number(heightCm);
   const w = Number(weightKg);
@@ -968,6 +1060,50 @@ function estimateBMR(heightCm, weightKg, age, isMale = true) {
   if (!h || !w || !a) return null;
   const base = 10 * w + 6.25 * h - 5 * a + (isMale ? 5 : -161);
   return Math.round(base);
+}
+
+// ====== GAMIFICACIÓN / LOGROS ======
+function computeHydrationStats() {
+  let daysWithWater = 0;
+  let totalMl = 0;
+  let totalGoal = 0;
+  for (let i = 0; i < derivedPlan.length; i++) {
+    const ws = getWaterState(i);
+    totalMl += ws.ml;
+    totalGoal += ws.goal;
+    if (ws.ml >= ws.goal * 0.8) {
+      daysWithWater++;
+    }
+  }
+  return {
+    daysWithWater,
+    totalMl,
+    totalGoal
+  };
+}
+function getStreak() {
+  // cuenta días completados seguidos desde el inicio
+  let streak = 0;
+  for (let i = 0; i < derivedPlan.length; i++) {
+    const done = localStorage.getItem(LS_PREFIX + "done-" + i) === "1";
+    if (done) streak++;
+    else break;
+  }
+  return streak;
+}
+function getAchievements() {
+  const ach = [];
+  const done = getCompletedCount();
+  const streak = getStreak();
+  const hydra = computeHydrationStats();
+
+  if (done >= 1) ach.push({id:"first-day", label: "🔥 Primer día completado"});
+  if (done >= 7) ach.push({id:"week-complete", label: "✅ 7 días dentro del plan"});
+  if (streak >= 3) ach.push({id:"streak-3", label: "📆 3 días seguidos"});
+  if (hydra.daysWithWater >= 3) ach.push({id:"water-3", label: "💧 3 días hidratado"});
+  if (hydra.daysWithWater >= 7) ach.push({id:"water-7", label: "💧 Pro de hidratación (7/7)"});
+
+  return ach;
 }
 
 // ====== PROGRESO ======
@@ -1005,6 +1141,33 @@ function renderProgreso() {
     </div>
   `;
   container.appendChild(baseBox);
+
+  // gamificación / logros
+  const achBox = document.createElement("div");
+  achBox.className = "list-row";
+  const ach = getAchievements();
+  achBox.innerHTML = `
+    <strong>${appLang === "en" ? "Achievements" : "Logros"}</strong>
+    ${ach.length ? `<ul class="ach-list">${ach.map(a => `<li>${a.label}</li>`).join("")}</ul>` : `<p class="small">${appLang === "en" ? "Complete days, drink water and train to unlock badges." : "Completa días, toma agua y entrena para desbloquear insignias."}</p>`}
+  `;
+  container.appendChild(achBox);
+
+  // hidratación resumen
+  const hydra = computeHydrationStats();
+  const waterBox = document.createElement("div");
+  waterBox.className = "list-row";
+  waterBox.innerHTML = `
+    <strong>${appLang === "en" ? "Hydration" : "Hidratación"}</strong>
+    <p class="small">
+      ${appLang === "en" ? "Days with water goal reached: " : "Días con meta de agua: "}
+      ${hydra.daysWithWater} / ${derivedPlan.length}
+    </p>
+    <p class="small">
+      ${appLang === "en" ? "Total water logged: " : "Agua registrada: "}
+      ${hydra.totalMl} ml
+    </p>
+  `;
+  container.appendChild(waterBox);
 
   const shareBox = document.createElement("div");
   shareBox.className = "list-row";
@@ -1271,6 +1434,7 @@ function switchTab(target) {
     document.getElementById("dislikeFoods").value = localStorage.getItem(LS_DISLIKE) || "";
     document.getElementById("apiUser").value = localStorage.getItem(LS_API_USER) || "";
     document.getElementById("apiPass").value = localStorage.getItem(LS_API_PASS) || "";
+    document.getElementById("waterGoalInput").value = getDailyWaterGoal();
   }
 }
 document.querySelectorAll(".tab").forEach(tab => {
@@ -1383,6 +1547,21 @@ function saveApiAccess() {
   showToast(appLang === "en" ? "API access saved" : "Acceso API guardado");
 }
 window.saveApiAccess = saveApiAccess;
+
+function saveWaterGoal() {
+  const val = Number(document.getElementById("waterGoalInput").value);
+  if (!val || val < 1000) {
+    showToast(appLang === "en" ? "Enter a valid amount" : "Pon una cantidad válida");
+    return;
+  }
+  localStorage.setItem(LS_WATER_GOAL, String(val));
+  showToast(appLang === "en" ? "Water goal saved" : "Meta de agua guardada");
+  // re-render día actual para que tome la nueva meta
+  const curIdx = Number(localStorage.getItem(LS_SELECTED_DAY)) || getCurrentDayIndex();
+  const curWeek = Number(localStorage.getItem(LS_SELECTED_WEEK)) || (Math.floor(curIdx / 7) + 1);
+  renderMenuDay(curIdx, curWeek);
+}
+window.saveWaterGoal = saveWaterGoal;
 
 // ====== ANIMACIONES ======
 function animateCards() {
@@ -1509,10 +1688,14 @@ function drawExerciseChart() {
 
   for (let idx = 0; idx < derivedPlan.length; idx++) {
     labels.push(derivedPlan[idx].dia);
-    planKcal.push(derivedPlan[idx].kcal || 1600);
+    // kcal plan del día
+    planKcal.push(derivedPlan[idx].kcal || 0);
+
     const saved = JSON.parse(localStorage.getItem(LS_PROGRESS_PREFIX + idx) || "{}");
+    // kcal de ejercicio que metió el usuario
     exerciseKcal.push(saved.exkcal ? Number(saved.exkcal) : 0);
-    energy.push(saved.energia ? Number(saved.energia) : null);
+    // energía auto-reportada
+    energy.push(saved.energia ? Number(saved.energia) : 0);
   }
 
   if (exerciseChart) exerciseChart.destroy();
@@ -1522,35 +1705,37 @@ function drawExerciseChart() {
   const gridColor = isDark ? "rgba(226,232,240,.06)" : "rgba(15,23,42,.05)";
 
   exerciseChart = new Chart(ctx, {
-    type: "bar",
+    type: "line",
     data: {
       labels,
       datasets: [
         {
-          type: "line",
-          label: appLang === "en" ? "Plan kcal" : "Plan kcal",
+          label: appLang === "en" ? "Plan kcal" : "Kcal plan",
           data: planKcal,
+          borderWidth: 1.8,
           borderColor: getPrimaryColor(),
-          borderWidth: 2,
-          tension: .35,
-          pointRadius: 2,
-          yAxisID: "y"
-        },
-        {
-          label: appLang === "en" ? "Exercise kcal" : "Calorías ejercicio",
-          data: exerciseKcal,
           backgroundColor: getPrimaryColor(),
-          yAxisID: "y"
+          tension: .35,
+          pointRadius: 2.5
         },
         {
-          type: "line",
+          label: appLang === "en" ? "Exercise kcal" : "Kcal ejercicio",
+          data: exerciseKcal,
+          borderWidth: 1.8,
+          borderColor: "#38bdf8",
+          backgroundColor: "#38bdf8",
+          tension: .35,
+          pointRadius: 2.5
+        },
+        {
           label: appLang === "en" ? "Energy (1-10)" : "Energía (1-10)",
           data: energy,
+          borderWidth: 1.4,
           borderColor: "#f97316",
-          borderWidth: 2,
-          yAxisID: "y1",
-          tension: .35,
-          pointRadius: 2
+          backgroundColor: "#f97316",
+          tension: .3,
+          pointRadius: 2.5,
+          yAxisID: "y1"
         }
       ]
     },
@@ -1558,10 +1743,19 @@ function drawExerciseChart() {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { labels: { color: axisColor } }
+        legend: {
+          labels: {
+            color: axisColor,
+            usePointStyle: true,
+            boxWidth: 8
+          }
+        }
       },
       scales: {
-        x: { ticks: { color: axisColor }, grid: { color: gridColor } },
+        x: {
+          ticks: { color: axisColor, autoSkip: true, maxTicksLimit: 8 },
+          grid: { color: gridColor }
+        },
         y: {
           ticks: { color: axisColor },
           grid: { color: gridColor },
@@ -1569,9 +1763,11 @@ function drawExerciseChart() {
         },
         y1: {
           position: "right",
-          ticks: { color: axisColor, stepSize: 1, suggestedMin: 0, suggestedMax: 10 },
+          ticks: { color: axisColor },
           grid: { drawOnChartArea: false },
-          title: { display: true, text: appLang === "en" ? "Energy" : "Energía", color: axisColor, font: { size: 10 } }
+          suggestedMin: 0,
+          suggestedMax: 10,
+          title: { display: true, text: "1-10", color: axisColor, font: { size: 10 } }
         }
       }
     }
@@ -1579,66 +1775,39 @@ function drawExerciseChart() {
 }
 
 // ====== INIT ======
-(function init() {
-  const savedPrimary = localStorage.getItem(LS_PRIMARY);
-  if (savedPrimary) {
-    document.documentElement.style.setProperty("--primary", savedPrimary);
-  }
+function initApp() {
+  appLang = localStorage.getItem(LS_LANG) || "es";
+  currentWeeks = Number(localStorage.getItem(LS_PLAN_WEEKS)) || 2;
+  dailyView = Number(localStorage.getItem(LS_DAILY_VIEW)) || 0;
 
-  const savedLang = localStorage.getItem(LS_LANG);
-  appLang = savedLang || "es";
-
-  const savedWeeks = Number(localStorage.getItem(LS_PLAN_WEEKS) || "2");
-  currentWeeks = savedWeeks >= 2 && savedWeeks <= 4 ? savedWeeks : 2;
+  // construir plan según semanas
   derivedPlan = buildPlan(currentWeeks);
 
-  dailyView = Number(localStorage.getItem(LS_DAILY_VIEW) || "0");
+  // aplicar color guardado
+  const savedColor = localStorage.getItem(LS_PRIMARY);
+  if (savedColor) {
+    document.documentElement.style.setProperty("--primary", savedColor);
+  }
 
-  const name = localStorage.getItem(LS_NAME) || "";
-  if (name) {
-    setHeaderName(name);
-    setRandomTip(name);
+  renderWeekButtons();
+  askStartDateIfNeeded();
+
+  const savedName = localStorage.getItem(LS_NAME);
+  if (savedName) {
+    setHeaderName(savedName);
+    setRandomTip(savedName);
   } else {
-    const modal = document.getElementById("nameModal");
-    if (modal) modal.style.display = "flex";
     setRandomTip();
   }
 
-  askStartDateIfNeeded();
-  renderWeekButtons();
+  // ir directo al menú
+  switchTab("menu");
 
-  let idx = Number(localStorage.getItem(LS_SELECTED_DAY));
-  let week = Number(localStorage.getItem(LS_SELECTED_WEEK));
-  if (isNaN(idx) || idx < 0 || idx >= derivedPlan.length) {
-    idx = getCurrentDayIndex();
+  // splash si existe
+  const splash = document.querySelector(".splash");
+  if (splash) {
+    setTimeout(() => splash.remove(), 1600);
   }
-  if (isNaN(week) || week < 1) {
-    week = Math.floor(idx / 7) + 1;
-  }
+}
 
-  if (!dailyView) {
-    setWeekActive(week);
-    renderDayPills(week);
-  }
-  renderMenuDay(idx, week);
-  updateProgressBar();
-  showMotivation();
-  hideToast();
-
-  // botones globales IA
-  const reviewBtn = document.getElementById("aiReviewDayBtn");
-  if (reviewBtn) {
-    reviewBtn.addEventListener("click", () => {
-      const curIdx = Number(localStorage.getItem(LS_SELECTED_DAY)) || getCurrentDayIndex();
-      const curWeek = Number(localStorage.getItem(LS_SELECTED_WEEK)) || (Math.floor(curIdx / 7) + 1);
-      reviewDayWithAI(curIdx, curWeek);
-    });
-  }
-  const weekBtn = document.getElementById("aiGenerateWeekBtn");
-  if (weekBtn) {
-    weekBtn.addEventListener("click", () => {
-      const curWeek = Number(localStorage.getItem(LS_SELECTED_WEEK)) || 1;
-      generateWeekWithAI(curWeek);
-    });
-  }
-})();
+document.addEventListener("DOMContentLoaded", initApp);
