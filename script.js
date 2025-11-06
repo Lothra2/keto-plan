@@ -16,6 +16,8 @@ const LS_API_PASS = LS_PREFIX + "api-pass";
 const LS_AI_DAY_PREFIX = LS_PREFIX + "ai-day-";
 const LS_CAL_PREFIX = LS_PREFIX + "cal-";
 const LS_PROGRESS_PREFIX = LS_PREFIX + "prog-";
+const LS_SELECTED_DAY = LS_PREFIX + "sel-day";
+const LS_SELECTED_WEEK = LS_PREFIX + "sel-week";
 
 const GROK_PROXY = "/.netlify/functions/grok";
 
@@ -370,6 +372,10 @@ function computeDynamicMacros(day, calState) {
 
 // ====== MENÚ DÍA ======
 function renderMenuDay(idx, week) {
+  // recordar selección
+  localStorage.setItem(LS_SELECTED_DAY, String(idx));
+  localStorage.setItem(LS_SELECTED_WEEK, String(week));
+
   const menuDays = document.getElementById("menuDays");
   menuDays.innerHTML = "";
   const day = getDayWithAI(idx);
@@ -437,6 +443,7 @@ function renderMenuDay(idx, week) {
 function buildMealBlock(idx, week, key, title, mealObj, done, isDinner = false) {
   const qty = mealObj && mealObj.qty ? mealObj.qty : "";
   const name = mealObj && mealObj.nombre ? mealObj.nombre : "";
+  const canIA = (key === "desayuno" || key === "almuerzo");
   return `
     <div class="meal ${done ? "meal-done" : ""}" ${isDinner ? 'id="cena-block"' : ""}>
       <div class="meal-title-row">
@@ -444,7 +451,10 @@ function buildMealBlock(idx, week, key, title, mealObj, done, isDinner = false) 
           <span class="meal-title-text">${title}</span>
           <span class="meal-qty" ${isDinner ? 'id="cena-qty"' : ""}>${qty}</span>
         </div>
-        <button class="cal-btn" onclick="toggleMealCal(${idx}, '${key}', ${week})">${done ? "✓" : "+"}</button>
+        <div class="meal-actions-right">
+          ${canIA ? `<button class="ia-mini-btn" onclick="generateMealAI(${idx}, '${key}', ${week})">IA</button>` : ""}
+          <button class="cal-btn" onclick="toggleMealCal(${idx}, '${key}', ${week})">${done ? "✓" : "+"}</button>
+        </div>
       </div>
       <div class="meal-name" ${isDinner ? 'id="cena-text"' : ""}>${name}</div>
     </div>
@@ -465,7 +475,6 @@ window.toggleDone = toggleDone;
 // ====== SWAP CENA MANUAL ======
 function swapCena(idx, week) {
   const option = cenaSwaps[Math.floor(Math.random() * cenaSwaps.length)];
-  // también lo guardamos en el AI-store como si fuera una modificación
   const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
   existing.cena = { nombre: option.nombre, qty: option.qty };
   localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
@@ -515,12 +524,10 @@ async function generateDinnerAI(idx) {
       showToast(lang === "en" ? "AI returned empty text" : "La IA devolvió texto vacío");
       return;
     }
-    // guardamos en el día IA parcial
     const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
     existing.cena = { nombre: aiText, qty: lang === "en" ? "AI dinner" : "Cena IA" };
     localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
 
-    // re-render
     const week = Math.floor(idx / 7) + 1;
     renderMenuDay(idx, week);
     showToast(lang === "en" ? "AI dinner updated" : "Cena IA actualizada");
@@ -530,6 +537,50 @@ async function generateDinnerAI(idx) {
   }
 }
 window.generateDinnerAI = generateDinnerAI;
+
+// ====== IA: DESAYUNO / ALMUERZO ======
+async function generateMealAI(idx, mealKey, week) {
+  const like = localStorage.getItem(LS_LIKE) || "";
+  const dislike = localStorage.getItem(LS_DISLIKE) || "";
+  const lang = appLang;
+  const apiUser = localStorage.getItem(LS_API_USER) || "";
+  const apiPass = localStorage.getItem(LS_API_PASS) || "";
+
+  const mealNameES = mealKey === "desayuno" ? "desayuno" : "almuerzo";
+  const mealNameEN = mealKey === "desayuno" ? "breakfast" : "lunch";
+
+  const prompt =
+    lang === "en"
+      ? `Create 1 short keto ${mealNameEN} (~350-600 kcal). Prefer: ${like}. Avoid: ${dislike}. Respond ONLY with one line like "Scrambled eggs with feta and avocado (2 eggs, 30 g feta, 1/2 avocado)".`
+      : `Genera 1 ${mealNameES} keto corto (~350-600 kcal). Prefiere: ${like}. Evita: ${dislike}. Responde SOLO con una línea así: "Huevos revueltos con feta y aguacate (2 huevos, 30 g feta, 1/2 aguacate)".`;
+
+  try {
+    const res = await fetch(GROK_PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, user: apiUser, pass: apiPass, mode: mealKey, lang })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      showToast(data.error || (lang === "en" ? "AI did not respond" : "IA no respondió"));
+      return;
+    }
+    let text = (data.text || "").replace(/\*\*/g, "").trim();
+    if (!text) {
+      showToast(lang === "en" ? "AI returned empty text" : "La IA devolvió texto vacío");
+      return;
+    }
+    const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
+    existing[mealKey] = { nombre: text, qty: lang === "en" ? "AI " + mealNameEN : "IA " + mealNameES };
+    localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
+    renderMenuDay(idx, week);
+    showToast(lang === "en" ? "AI meal updated" : "Comida IA actualizada");
+  } catch (e) {
+    console.error(e);
+    showToast(appLang === "en" ? "Error calling AI" : "Error llamando a la IA");
+  }
+}
+window.generateMealAI = generateMealAI;
 
 // ====== IA: DÍA COMPLETO ======
 async function generateFullDayAI(idx, week) {
@@ -574,7 +625,6 @@ async function generateFullDayAI(idx, week) {
     }
 
     if (structured) {
-      // normalizamos para que tenga tus mismas llaves
       const normalized = {
         dia: baseDay.dia,
         kcal: structured.kcal || baseDay.kcal,
@@ -598,15 +648,26 @@ async function generateFullDayAI(idx, week) {
 }
 window.generateFullDayAI = generateFullDayAI;
 
-// ====== IA: WORKOUT DEL DÍA ======
+// ====== IA: WORKOUT DEL DÍA (FORMATO LIMPIO) ======
+function parseWorkoutTextToClean(raw, lang) {
+  // fallback por si la IA no devuelve JSON
+  const lines = (raw || "").split("\n").map(l => l.trim()).filter(Boolean);
+  return lines.map((l, i) => ({
+    nombre: l.replace(/^\d+[\).\-\s]*/, "").replace(/^\-\s*/, ""),
+    series: lang === "en" ? "3 sets" : "3 series",
+    descripcion: ""
+  }));
+}
+
 async function generateWorkoutAI(idx, week) {
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
   const lang = appLang;
   const prompt =
     lang === "en"
-      ? "Create 5 bodyweight exercises for today to maximize fat loss, very short, bullet list. User is beginner/intermediate."
-      : "Crea 5 ejercicios de peso corporal para hoy para maximizar pérdida de grasa, muy corto, en viñetas. Usuario nivel inicial/intermedio.";
+      ? "Return a JSON with a field 'ejercicios' that is an array of up to 5 items. Each item: {\"nombre\": short exercise name, \"series\": like \"3 x 12\" or time, \"descripcion\": very short tip}. Bodyweight only. Beginner/intermediate. English."
+      : "Devuelve un JSON con un campo 'ejercicios' que sea un array de máximo 5 ítems. Cada ítem: {\"nombre\": nombre corto del ejercicio, \"series\": por ejemplo \"3 x 12\" o tiempo, \"descripcion\": tip muy corto}. Solo peso corporal. Nivel inicial/intermedio. Español.";
+
   try {
     const res = await fetch(GROK_PROXY, {
       method: "POST",
@@ -620,9 +681,40 @@ async function generateWorkoutAI(idx, week) {
     }
     const box = document.getElementById("ai-workout-list-" + idx);
     if (box) {
-      const lines = (data.text || "").split("\n").filter(l => l.trim());
-      box.innerHTML = "<p class='small'><strong>" + (lang === "en" ? "AI workout" : "Entreno IA") + ":</strong></p>" +
-        "<ul>" + lines.map(l => "<li>" + l.replace(/^\-\s*/, "") + "</li>").join("") + "</ul>";
+      let workouts = [];
+      if (data.structured && Array.isArray(data.structured.ejercicios)) {
+        workouts = data.structured.ejercicios;
+      } else {
+        try {
+          const parsed = JSON.parse(data.text);
+          if (parsed && Array.isArray(parsed.ejercicios)) {
+            workouts = parsed.ejercicios;
+          } else {
+            workouts = parseWorkoutTextToClean(data.text, lang);
+          }
+        } catch(e) {
+          workouts = parseWorkoutTextToClean(data.text, lang);
+        }
+      }
+
+      box.innerHTML =
+        `<p class="small"><strong>${lang === "en" ? "AI workout" : "Entreno IA"}:</strong></p>` +
+        `<div class="ai-workout-grid">` +
+        workouts
+          .map(w => {
+            const n = w.nombre || w.name || "";
+            const s = w.series || w.reps || "";
+            const d = w.descripcion || w.desc || "";
+            return `
+              <div class="ai-workout-item">
+                <div class="ai-w-name">${n}</div>
+                <div class="ai-w-series">${s}</div>
+                <div class="ai-w-desc">${d}</div>
+              </div>
+            `;
+          })
+          .join("") +
+        `</div>`;
       box.style.display = "block";
     }
     showToast(lang === "en" ? "Workout generated" : "Entreno generado");
@@ -666,7 +758,6 @@ function renderCompras() {
     container.appendChild(row);
   });
 
-  // extras IA
   const aiExtras = [];
   for (let idx = 0; idx < derivedPlan.length; idx++) {
     const aiDay = localStorage.getItem(LS_AI_DAY_PREFIX + idx);
@@ -732,7 +823,6 @@ function renderProgreso() {
   `;
   container.appendChild(shareBox);
 
-  // chart weight
   const canvasWrap = document.createElement("div");
   canvasWrap.style.height = "210px";
   canvasWrap.style.position = "relative";
@@ -742,7 +832,6 @@ function renderProgreso() {
   canvasWrap.appendChild(canvas);
   container.appendChild(canvasWrap);
 
-  // chart exercise / energy
   const canvasWrap2 = document.createElement("div");
   canvasWrap2.style.height = "210px";
   canvasWrap2.style.position = "relative";
@@ -903,8 +992,16 @@ function switchTab(target) {
   hideToast();
 
   if (target === "menu") {
-    const idx = getCurrentDayIndex();
-    const week = Math.floor(idx / 7) + 1;
+    // preferir lo último que vio el usuario
+    let idx = Number(localStorage.getItem(LS_SELECTED_DAY));
+    let week = Number(localStorage.getItem(LS_SELECTED_WEEK));
+    if (isNaN(idx) || idx < 0 || idx >= derivedPlan.length) {
+      idx = getCurrentDayIndex();
+    }
+    if (isNaN(week) || week < 1) {
+      week = Math.floor(idx / 7) + 1;
+    }
+
     if (!dailyView) {
       setWeekActive(week);
       renderDayPills(week);
@@ -1265,8 +1362,16 @@ function drawExerciseChart() {
   askStartDateIfNeeded();
   renderWeekButtons();
 
-  const idx = getCurrentDayIndex();
-  const week = Math.floor(idx / 7) + 1;
+  // preferimos lo último que vio; si no hay, usamos índice por fecha
+  let idx = Number(localStorage.getItem(LS_SELECTED_DAY));
+  let week = Number(localStorage.getItem(LS_SELECTED_WEEK));
+  if (isNaN(idx) || idx < 0 || idx >= derivedPlan.length) {
+    idx = getCurrentDayIndex();
+  }
+  if (isNaN(week) || week < 1) {
+    week = Math.floor(idx / 7) + 1;
+  }
+
   if (!dailyView) {
     setWeekActive(week);
     renderDayPills(week);

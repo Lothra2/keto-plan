@@ -783,3 +783,72 @@ input[type="date"] {
     font-size: .75rem;
   }
 }
+/* === IA mini button dentro de las comidas === */
+.meal-actions-right {
+  display: flex;
+  gap: .35rem;
+  align-items: center;
+}
+
+.ia-mini-btn {
+  border: none;
+  background: rgba(14,165,233,.28);
+  color: #fff;
+  font-size: .52rem;
+  border-radius: 999px;
+  padding: .15rem .4rem .2rem;
+  cursor: pointer;
+  line-height: 1;
+  transition: opacity .15s ease;
+}
+.ia-mini-btn:hover {
+  opacity: .9;
+}
+
+/* === Lista de entreno IA limpia === */
+.ai-workout-list {
+  font-size: .6rem;
+  margin-top: .35rem;
+  background: rgba(15,23,42,.12);
+  border-radius: .55rem;
+  padding: .35rem .4rem .25rem;
+}
+
+/* grid de tarjetas pequeñas */
+.ai-workout-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: .35rem;
+  margin-top: .3rem;
+}
+
+.ai-workout-item {
+  background: rgba(15,23,42,.22);
+  border: 1px solid rgba(148,163,184,.05);
+  border-radius: .55rem;
+  padding: .35rem .4rem .3rem;
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+}
+
+.ai-w-name {
+  font-weight: 600;
+  font-size: .6rem;
+}
+.ai-w-series {
+  font-size: .55rem;
+  opacity: .7;
+}
+.ai-w-desc {
+  font-size: .53rem;
+  opacity: .6;
+  line-height: 1.05;
+}
+
+/* en pantallas más grandes podemos hacer 2 columnas */
+@media (min-width: 600px) {
+  .ai-workout-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
