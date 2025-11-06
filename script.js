@@ -16,10 +16,12 @@ const LS_API_USER = LS_PREFIX + "api-user";
 const LS_API_PASS = LS_PREFIX + "api-pass";
 const LS_AI_DAY_PREFIX = LS_PREFIX + "ai-day-";
 const LS_AI_WORKOUT = LS_PREFIX + "ai-workout-"; // guardar entreno IA por día
+const LS_AI_WEEK_PREFIX = LS_PREFIX + "ai-week-"; // guardar revisión IA por semana
 const LS_CAL_PREFIX = LS_PREFIX + "cal-";
 const LS_PROGRESS_PREFIX = LS_PREFIX + "prog-";
 const LS_SELECTED_DAY = LS_PREFIX + "sel-day";
 const LS_SELECTED_WEEK = LS_PREFIX + "sel-week";
+
 // agua
 const LS_WATER_PREFIX = LS_PREFIX + "water-";
 const LS_WATER_GOAL = LS_PREFIX + "water-goal";
@@ -1008,6 +1010,21 @@ async function generateWeekWithAI(week) {
 }
 window.generateWeekWithAI = generateWeekWithAI;
 
+// ====== RENDERIZAR REVISIÓN SEMANAL GUARDADA ======
+function renderStoredWeekReview(week) {
+  const box = document.getElementById("aiWeekSummary");
+  if (!box) return;
+  const saved = localStorage.getItem(LS_AI_WEEK_PREFIX + week);
+  if (saved) {
+    box.innerHTML = saved;
+    box.style.display = "block";
+  } else {
+    box.innerHTML = "";
+    box.style.display = "none";
+  }
+}
+
+
 // ====== IA: REVISIÓN SEMANAL (NUEVO) ======
 async function reviewWeekWithAI() {
   const lang = appLang;
@@ -1056,11 +1073,14 @@ async function reviewWeekWithAI() {
       showToast(data.error || (lang === "en" ? "AI did not respond" : "IA no respondió"));
       return;
     }
+
     const box = document.getElementById("aiWeekSummary");
     if (box) {
-      const clean = (data.text || "").replace(/\*/g, "").trim();
+      // limpiamos los ### que trae la IA
+      const clean = (data.text || "").replace(/\*/g, "").replace(/###\s*/g, "").trim();
       const parts = clean.split(/\n+/).filter(Boolean).slice(0, 4);
-      box.innerHTML = `
+
+      const html = `
         <div class="ai-week-title">${lang === "en" ? "AI weekly review" : "Revisión IA de la semana"}</div>
         <div class="ai-week-body">
           ${parts
@@ -1068,14 +1088,21 @@ async function reviewWeekWithAI() {
             .join("")}
         </div>
       `;
+
+      box.innerHTML = html;
       box.style.display = "block";
-      showToast(lang === "en" ? "Week reviewed" : "Semana revisada");
+
+      // guardar esta revisión pero asociada a ESA semana
+      localStorage.setItem(LS_AI_WEEK_PREFIX + selWeek, html);
     }
+
+    showToast(lang === "en" ? "Week reviewed" : "Semana revisada");
   } catch (err) {
     console.error(err);
     showToast(lang === "en" ? "Error calling AI" : "Error llamando a la IA");
   }
 }
+
 window.reviewWeekWithAI = reviewWeekWithAI;
 
 // ====== IA: MOTIVACIÓN DEL DÍA (NUEVO) ======
@@ -1597,6 +1624,8 @@ document.addEventListener("click", e => {
     const firstDayIndex = (week - 1) * 7;
     localStorage.setItem(LS_SELECTED_DAY, String(firstDayIndex));
     renderMenuDay(firstDayIndex, week);
+    // 👇 nuevo: mostrar revisión de esa semana si existe
+    renderStoredWeekReview(week);
   }
 });
 
@@ -1932,6 +1961,7 @@ function initApp() {
     renderDayPills(week);
   }
   renderMenuDay(idx, week);
+  renderStoredWeekReview(week); // 👈 nuevo
   updateProgressBar();
   showMotivation();
 
