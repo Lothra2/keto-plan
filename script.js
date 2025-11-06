@@ -699,6 +699,7 @@ async function generateMealAI(idx, mealKey, week) {
     mealNameES = "cena";
     mealNameEN = "dinner";
   }
+  const baseDay = derivedPlan[idx];
 
   // Si el usuario está en un día generado por IA, el botón debe funcionar igual.
   // Ocultamos el grid de comidas base si existe y nos aseguramos que el contenedor IA esté visible.
@@ -709,16 +710,24 @@ async function generateMealAI(idx, mealKey, week) {
       renderAiDay('', idx, `aiDayOutput-${idx}`); // Prepara el contenedor si está vacío
   }
 
-  const prompt =
-    lang === "en"
-      ? `Create 1 short keto ${mealNameEN} (~350-600 kcal). Prefer: ${like}. Avoid: ${dislike}. Respond ONLY with one line like "Scrambled eggs with feta and avocado (2 eggs, 30 g feta, 1/2 avocado)".`
-      : `Genera 1 ${mealNameES} keto corto (~350-600 kcal). Prefiere: ${like}. Evita: ${dislike}. Responde SOLO con una línea así: "Huevos revueltos con feta y aguacate (2 huevos, 30 g feta, 1/2 aguacate)".`;
+  // --- CORRECCIÓN CLAVE ---
+  // Construimos un payload estructurado, igual que en las otras funciones de IA.
+  // El backend espera este formato, no un prompt simple.
+  const payload = {
+    mode: mealKey, // 'desayuno', 'almuerzo', 'cena'
+    lang,
+    user: apiUser,
+    pass: apiPass,
+    kcal: baseDay.kcal,
+    prefs: { like, dislike },
+    dayIndex: idx + 1
+  };
 
   try {
     const res = await fetch(GROK_PROXY, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, user: apiUser, pass: apiPass, mode: mealKey, lang })
+      body: JSON.stringify(payload) // Enviamos el payload corregido
     });
     const data = await res.json();
     if (!data.ok) {
@@ -731,25 +740,28 @@ async function generateMealAI(idx, mealKey, week) {
       return;
     }
 
-    // Si el día IA no existía, lo creamos. Si existía, lo actualizamos.
+    // Lógica para actualizar el día IA en localStorage
     const aiDayStored = localStorage.getItem(LS_AI_DAY_PREFIX + idx);
     let dayData;
     if (aiDayStored) {
         dayData = JSON.parse(aiDayStored);
     } else {
-        // Si no hay día IA, creamos uno a partir del plan base para no perder las otras comidas
-        const baseDay = derivedPlan[idx];
+        // Si no hay día IA, creamos uno a partir del plan base para no perder las otras comidas al generar la primera.
         dayData = { rawText: `Desayuno: ${baseDay.desayuno.nombre}\nAlmuerzo: ${baseDay.almuerzo.nombre}\nCena: ${baseDay.cena.nombre}` };
     }
 
     // Reemplazamos la comida específica en el texto crudo y lo guardamos
-    const mealTitleRegex = new RegExp(`(${mealNameES}|${mealNameEN}):.*`, "i");
+    const mealTitleES = mealKey === 'desayuno' ? 'Desayuno' : (mealKey === 'almuerzo' ? 'Almuerzo' : 'Cena');
+    const mealTitleEN = mealKey === 'desayuno' ? 'Breakfast' : (mealKey === 'almuerzo' ? 'Lunch' : 'Dinner');
+    const mealTitleRegex = new RegExp(`(${mealTitleES}|${mealTitleEN}):.*`, "i");
+
     if (dayData.rawText.match(mealTitleRegex)) {
-        dayData.rawText = dayData.rawText.replace(mealTitleRegex, `${mealKey === 'desayuno' ? 'Desayuno' : (mealKey === 'almuerzo' ? 'Almuerzo' : 'Cena')}: ${text}`);
+        dayData.rawText = dayData.rawText.replace(mealTitleRegex, `${mealTitleES}: ${text}`);
     } else {
-        dayData.rawText += `\n${mealKey === 'desayuno' ? 'Desayuno' : (mealKey === 'almuerzo' ? 'Almuerzo' : 'Cena')}: ${text}`;
+        dayData.rawText += `\n${mealTitleES}: ${text}`;
     }
     localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(dayData));
+
     // En lugar de recargar todo, actualizamos solo la comida
     renderSingleMeal(text, idx, mealKey);
   } catch (e) {
