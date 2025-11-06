@@ -826,13 +826,45 @@ async function reviewDayWithAI(idx, week) {
 
     const reviewBox = document.getElementById("ai-review-" + idx);
     if (reviewBox) {
-      const clean = (data.text || "").replace(/\*/g, "").trim();
+      // limpiamos y tratamos de dividir en 3 partes
+      const raw = (data.text || "").replace(/\*/g, "").trim();
+
+      // lo partimos por saltos de línea o por " - "
+      let parts = raw.split(/\n| - |\u2022/g).map(t => t.trim()).filter(Boolean);
+      // nos quedamos con máximo 3
+      parts = parts.slice(0, 3);
+
+      // si viniera todo en una línea, lo metemos completo en el primero
+      if (!parts.length) {
+        parts = [raw];
+      }
+
       reviewBox.innerHTML = `
         <div class="ai-review-title">${lang === "en" ? "AI review of your day" : "Revisión IA de tu día"}</div>
-        <p class="small">${clean}</p>
+        <div class="ai-review-list">
+          ${parts
+            .map((txt, i) => {
+              const labelsES = ["Grasa", "Proteína", "Tip"];
+              const labelsEN = ["Fat", "Protein", "Tip"];
+              const label = lang === "en" ? labelsEN[i] || "Note" : labelsES[i] || "Nota";
+              const icons = ["🥑","🍗","💬"];
+              const icon = icons[i] || "•";
+              return `
+                <div class="ai-review-item">
+                  <div class="ai-review-icon">${icon}</div>
+                  <div class="ai-review-content">
+                    <h5>${label}</h5>
+                    <p>${txt}</p>
+                  </div>
+                </div>
+              `;
+            })
+            .join("")}
+        </div>
       `;
       reviewBox.style.display = "block";
     }
+
     showToast(lang === "en" ? "Day reviewed" : "Día revisado");
   } catch (e) {
     console.error(e);
