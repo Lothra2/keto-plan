@@ -1411,7 +1411,7 @@ function switchTab(target) {
     }
 
     localStorage.setItem(LS_SELECTED_WEEK, String(week));
-    
+
     if (!dailyView) {
       setWeekActive(week);
       renderDayPills(week);
@@ -1448,15 +1448,24 @@ document.querySelectorAll(".bottom-btn").forEach(btn => {
 document.addEventListener("click", e => {
   const btn = e.target.closest(".week-btn");
   if (btn) {
+    // 1. marcar visualmente
     document.querySelectorAll(".week-btn").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
+
+    // 2. semana seleccionada
     const week = Number(btn.dataset.week);
     localStorage.setItem(LS_SELECTED_WEEK, String(week));
+
+    // 3. renderizar las pastillas de esa semana
     renderDayPills(week);
-    const savedIdx = Number(localStorage.getItem(LS_SELECTED_DAY)) || (week - 1) * 7;
-    renderMenuDay(savedIdx, week);
+
+    // 4. **forzar siempre el primer día de esa semana**
+    const firstDayIndex = (week - 1) * 7; // 0,7,14,21...
+    localStorage.setItem(LS_SELECTED_DAY, String(firstDayIndex));
+    renderMenuDay(firstDayIndex, week);
   }
 });
+
 
 
 // ====== THEME ======
