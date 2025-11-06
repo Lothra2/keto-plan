@@ -16,10 +16,18 @@ const LS_API_USER = LS_PREFIX + "api-user";
 const LS_API_PASS = LS_PREFIX + "api-pass";
 const LS_AI_DAY_PREFIX = LS_PREFIX + "ai-day-";
 const LS_AI_WORKOUT = LS_PREFIX + "ai-workout-"; // guardar entreno IA por día
+const LS_AI_WEEK_PREFIX = LS_PREFIX + "ai-week-"; // guardar revisión IA por semana
 const LS_CAL_PREFIX = LS_PREFIX + "cal-";
 const LS_PROGRESS_PREFIX = LS_PREFIX + "prog-";
 const LS_SELECTED_DAY = LS_PREFIX + "sel-day";
 const LS_SELECTED_WEEK = LS_PREFIX + "sel-week";
+
+// agua
+const LS_WATER_PREFIX = LS_PREFIX + "water-";
+const LS_WATER_GOAL = LS_PREFIX + "water-goal";
+
+// gamificación básica
+const LS_BADGE_PREFIX = LS_PREFIX + "badge-";
 
 const GROK_PROXY = "/.netlify/functions/grok";
 
@@ -69,12 +77,6 @@ const basePlan = [
   {dia:"Día 14",kcal:1600,macros:{carbs:"7%",prot:"24%",fat:"69%"},desayuno:{nombre:"Omelette feta y rocket",qty:"2-3 huevos, 30 g feta, 30 g rocket"},snackAM:{nombre:"Yogur con chía",qty:"120 g yogur, 5 g chía"},almuerzo:{nombre:"Pollo con aguacate y tomate",qty:"140 g pollo, 1/2 aguacate, 40 g tomate"},snackPM:{nombre:"Marañones o feta",qty:"20 g marañones o 25 g feta"},cena:{nombre:"Filete de res con brócoli y mantequilla",qty:"160 g res, 100 g brócoli, 5 g mantequilla"}}
 ];
 
-const cenaSwaps = [
-  {nombre:"Pollo 150 g con brócoli 120 g y mantequilla 5 g",qty:"150 g pollo, 120 g brócoli, 5 g mantequilla"},
-  {nombre:"Hamburguesa sin pan con queso y ensalada",qty:"150 g carne, 20 g queso, ensalada verde"},
-  {nombre:"Salmón 140 g con ensalada verde",qty:"140 g salmón, 50 g hojas verdes"}
-];
-
 const tipsES = [
   "🥤 Toma agua con un poco de sal.",
   "🥑 Si tienes hambre sube grasa.",
@@ -89,6 +91,47 @@ const tipsEN = [
   "📸 Take a picture on day 1 and last day.",
   "🧴 You can swap butter for olive oil."
 ];
+
+// frases motivacionales por día
+const motivationalES = [
+  "Vas un día a la vez. Manténlo simple.",
+  "Tu yo de mañana te va a agradecer esto.",
+  "No tiene que ser perfecto, solo consistente.",
+  "Comiste bien, ahora hidrátate 💧.",
+  "Moverte 20 min hoy ya es ganancia.",
+  "Esto ya parece rutina, sigue así.",
+  "Casi cierras la semana 👏.",
+  "Nueva semana, mismas metas.",
+  "Tu cuerpo ya está respondiendo.",
+  "No subestimes los snacks limpios.",
+  "Buen ritmo, no lo sueltes.",
+  "Tómate 5 min de estiramientos.",
+  "Ya casi terminas el plan.",
+  "Cierra con foto y peso 😉"
+];
+const motivationalEN = [
+  "One day at a time. Keep it simple.",
+  "Your future you will love this.",
+  "It doesn’t need to be perfect, just consistent.",
+  "You ate clean, now hydrate 💧.",
+  "Move 20 min today, that’s enough.",
+  "This is becoming a routine.",
+  "Almost closing the week 👏.",
+  "New week, same goals.",
+  "Your body is responding already.",
+  "Clean snacks matter.",
+  "Nice pace, keep it.",
+  "Take 5 min for stretches.",
+  "You’re close to the finish.",
+  "Close with photo and weight 😉"
+];
+
+// tips locales para no gastar IA
+const localSmartTips = {
+  desayuno: "Tip: ya tienes un desayuno base, úsalo y guarda IA para el día completo 😉",
+  almuerzo: "Tip: puedes usar el almuerzo base y solo cambiar proteína.",
+  cena: "Tip: si solo quieres variar la cena, prueba el swap manual antes de usar IA."
+};
 
 // ====== WORKOUTS LOCALIZADOS ======
 const localizedWorkouts = {
@@ -176,7 +219,7 @@ function setRandomTip(name) {
   tipBox.textContent = name ? base + " " + name + "." : base;
 }
 
-// ====== MOTIVACIÓN ======
+// ====== MOTIVACIÓN GLOBAL (sigue existiendo) ======
 function showMotivation() {
   const box = document.getElementById("motivation");
   const done = getCompletedCount();
@@ -347,6 +390,46 @@ function toggleMealCal(idx, mealKey, week) {
 }
 window.toggleMealCal = toggleMealCal;
 
+// ====== AGUA POR DÍA ======
+function getDailyWaterGoal() {
+  const saved = Number(localStorage.getItem(LS_WATER_GOAL));
+  return saved && saved > 0 ? saved : 2400; // ml por defecto
+}
+function getWaterState(idx) {
+  const stored = localStorage.getItem(LS_WATER_PREFIX + idx);
+  const goal = getDailyWaterGoal();
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      return {
+        goal: parsed.goal || goal,
+        ml: parsed.ml || 0
+      };
+    } catch(e) {}
+  }
+  return {
+    goal,
+    ml: 0
+  };
+}
+function saveWaterState(idx, state) {
+  localStorage.setItem(LS_WATER_PREFIX + idx, JSON.stringify(state));
+}
+function addWater(idx, week, amount) {
+  const dayWater = getWaterState(idx);
+  dayWater.ml = Math.max(0, dayWater.ml + amount);
+  saveWaterState(idx, dayWater);
+  renderMenuDay(idx, week);
+}
+window.addWater = addWater;
+function resetWater(idx, week) {
+  const dayWater = getWaterState(idx);
+  dayWater.ml = 0;
+  saveWaterState(idx, dayWater);
+  renderMenuDay(idx, week);
+}
+window.resetWater = resetWater;
+
 // ====== OBTENER DÍA CON IA MERGEADO ======
 function getDayWithAI(idx) {
   let day = derivedPlan[idx];
@@ -377,6 +460,54 @@ function computeDynamicMacros(day, calState) {
   };
 }
 
+// ====== EXTRAS IA POR DÍA ======
+function extractIngredientsFromQty(qty) {
+  if (!qty) return [];
+  return qty
+    .split(/,|•/g)
+    .map(t => t.trim())
+    .filter(Boolean)
+    .map(t => t.replace(/\s+/g, " "));
+}
+function collectAIExtrasForDay(idx) {
+  const extras = [];
+  const aiDay = localStorage.getItem(LS_AI_DAY_PREFIX + idx);
+  if (!aiDay) return extras;
+  try {
+    const parsed = JSON.parse(aiDay);
+    ["desayuno","snackAM","almuerzo","snackPM","cena"].forEach(m => {
+      if (parsed[m] && parsed[m].qty) {
+        const ing = extractIngredientsFromQty(parsed[m].qty);
+        ing.forEach(x => extras.push(x));
+      }
+    });
+  } catch(e) {}
+  return extras;
+}
+function renderAIExtras(idx) {
+  const cont = document.getElementById("ai-extras-" + idx);
+  if (!cont) return;
+  const extras = collectAIExtrasForDay(idx);
+  if (!extras.length) {
+    cont.style.display = "none";
+    cont.innerHTML = "";
+    return;
+  }
+  cont.style.display = "flex";
+  cont.innerHTML = `
+    <div class="ai-extras-title">${appLang === "en" ? "AI extras for today" : "Extras IA para hoy"}</div>
+    <div class="ai-extras-chips">
+      ${extras.map(e => `<span class="ai-chip">+ ${e}</span>`).join("")}
+    </div>
+  `;
+}
+
+// ====== MENSAJE MOTIVACIONAL POR DÍA ======
+function getDailyMotivation(idx) {
+  const source = appLang === "en" ? motivationalEN : motivationalES;
+  return source[idx % source.length];
+}
+
 // ====== MENÚ DÍA ======
 function renderMenuDay(idx, week) {
   // recordar selección
@@ -398,10 +529,17 @@ function renderMenuDay(idx, week) {
   const calPercent = Math.min(100, Math.round((calCalc.consumed / calCalc.goal) * 100));
   const dynMacros = computeDynamicMacros(day, calState);
 
+  const water = getWaterState(idx);
+  const waterPercent = Math.min(100, Math.round((water.ml / water.goal) * 100));
+  const motivationText = getDailyMotivation(idx);
+
   card.innerHTML = `
     <div class="day-title">
       <h2>${day.dia}</h2>
       <div class="kcal">${day.kcal || 1600} kcal</div>
+    </div>
+    <div class="day-motivation">
+      ${motivationText}
     </div>
     <div class="macros">
       <div class="macro">Carbs ${dynMacros.carbs}</div>
@@ -417,6 +555,20 @@ function renderMenuDay(idx, week) {
         <span style="width:${calPercent}%" id="cal-bar-${idx}"></span>
       </div>
     </div>
+    <div class="hydration-box">
+      <div class="hydration-head">
+        💧 ${appLang === "en" ? "Water today" : "Agua de hoy"}
+        <span>${water.ml} / ${water.goal} ml</span>
+      </div>
+      <div class="hydration-line">
+        <span style="width:${waterPercent}%"></span>
+      </div>
+      <div class="hydration-actions">
+        <button onclick="addWater(${idx}, ${week}, 250)">+250ml</button>
+        <button onclick="addWater(${idx}, ${week}, 500)">+500ml</button>
+        <button class="ghost" onclick="resetWater(${idx}, ${week})">${appLang === "en" ? "Reset" : "Reiniciar"}</button>
+      </div>
+    </div>
     <div class="food-grid">
       ${buildMealBlock(idx, week, "desayuno", "🍳 " + (appLang === "en" ? "Breakfast" : "Desayuno"), day.desayuno, calState.meals.desayuno)}
       ${buildMealBlock(idx, week, "snackAM", "⏰ " + (appLang === "en" ? "Snack AM" : "Snack AM"), day.snackAM, calState.meals.snackAM)}
@@ -424,6 +576,9 @@ function renderMenuDay(idx, week) {
       ${buildMealBlock(idx, week, "snackPM", "🥜 " + (appLang === "en" ? "Snack PM" : "Snack PM"), day.snackPM, calState.meals.snackPM)}
       ${buildMealBlock(idx, week, "cena", "🍖 " + (appLang === "en" ? "Dinner" : "Cena"), day.cena, calState.meals.cena, true)}
     </div>
+    <!-- Contenedor para el día completo generado por IA -->
+    <div id="aiDayOutput-${idx}"></div>
+    <div class="ai-extras-box" id="ai-extras-${idx}" style="display:none"></div>
     <div class="workout-box">
       <strong>${appLang === "en" ? "Weekly focus" : "Foco semanal"}:</strong>
       <p class="small">${workout.focus}</p>
@@ -432,12 +587,16 @@ function renderMenuDay(idx, week) {
       <button class="ia-btn small-btn" onclick="generateWorkoutAI(${idx}, ${week})">${appLang === "en" ? "Workout AI 🏋️" : "Entreno IA 🏋️"}</button>
       <div class="ai-workout-list" id="ai-workout-list-${idx}" style="display:none"></div>
     </div>
+    <div class="ai-review-box" id="ai-review-${idx}" style="display:none"></div>
     <div class="day-actions">
       <button class="done-btn ${done ? "done" : ""}" onclick="toggleDone(${idx}, ${week})">
         ${done ? (appLang === "en" ? "✔ Day completed" : "✔ Día completado") : (appLang === "en" ? "Mark day ✔" : "Marcar día ✔")}
       </button>
       <button class="ia-btn" onclick="generateFullDayAI(${idx}, ${week})">
         ${appLang === "en" ? "Full day AI 📅" : "Día completo IA 📅"}
+      </button>
+      <button class="ia-btn ghost-btn" onclick="reviewDayWithAI(${idx}, ${week})">
+        ${appLang === "en" ? "Analyze AI plan 💬" : "Analizar plan IA 💬"}
       </button>
     </div>
   `;
@@ -451,6 +610,17 @@ function renderMenuDay(idx, week) {
       renderWorkoutCardsFromArray(idx, parsed, appLang);
     } catch (e) {}
   }
+  
+  // Si hay un día IA guardado, lo renderizamos en su contenedor
+  const aiDayStored = localStorage.getItem(LS_AI_DAY_PREFIX + idx);
+  if (aiDayStored) {
+    try {
+        const parsed = JSON.parse(aiDayStored);
+        renderAiDay(parsed.rawText, idx, `aiDayOutput-${idx}`);
+    } catch(e) {}
+  }
+
+  renderAIExtras(idx);
 
   animateCards();
   document.querySelectorAll(".day-pill").forEach((p, i) => {
@@ -462,6 +632,7 @@ function renderMenuDay(idx, week) {
 function buildMealBlock(idx, week, key, title, mealObj, done, isDinner = false) {
   const qty = mealObj && mealObj.qty ? mealObj.qty : "";
   const name = mealObj && mealObj.nombre ? mealObj.nombre : "";
+  const note = mealObj && mealObj.note ? mealObj.note : "";
 
   const canIA = (key === "desayuno" || key === "almuerzo" || key === "cena");
 
@@ -478,6 +649,7 @@ function buildMealBlock(idx, week, key, title, mealObj, done, isDinner = false) 
         </div>
       </div>
       <div class="meal-name" ${isDinner ? 'id="cena-text"' : ""}>${name}</div>
+      ${note ? `<p class="meal-note">${note}</p>` : ""}
     </div>
   `;
 }
@@ -493,80 +665,31 @@ function toggleDone(idx, week) {
 }
 window.toggleDone = toggleDone;
 
-// ====== SWAP CENA MANUAL ======
-function swapCena(idx, week) {
-  const option = cenaSwaps[Math.floor(Math.random() * cenaSwaps.length)];
-  const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
-  existing.cena = { nombre: option.nombre, qty: option.qty };
-  localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
-  renderMenuDay(idx, week);
-}
-window.swapCena = swapCena;
-
-// ====== LIMPIAR TEXTO CENA IA ======
-function cleanAiDinnerText(raw) {
-  if (!raw) return "";
-  let text = raw.trim();
-  text = text.replace(/\*\*/g, "");
-  text = text.replace(/^\s*T[ií]tulo:\s*/i, "");
-  if (text.length > 180) {
-    const firstLine = text.split("\n").find(l => l.trim().length > 0) || text;
-    text = firstLine.trim();
+// ====== ANALIZADOR RÁPIDO DE COMIDA IA ======
+function analyzeAIMeal(text) {
+  if (!text) return null;
+  const lower = text.toLowerCase();
+  const notes = [];
+  if (lower.includes("mantequilla") || lower.includes("crema") || lower.includes("queso") || lower.includes("cheese")) {
+    notes.push(appLang === "en" ? "High in dairy, adjust if needed." : "Tiene lácteos, ajusta si quieres.");
   }
-  return text;
-}
-
-// ====== IA: DINNER (botón separado) ======
-async function generateDinnerAI(idx) {
-  const like = localStorage.getItem(LS_LIKE) || "";
-  const dislike = localStorage.getItem(LS_DISLIKE) || "";
-  const lang = appLang;
-  const apiUser = localStorage.getItem(LS_API_USER) || "";
-  const apiPass = localStorage.getItem(LS_API_PASS) || "";
-
-  const prompt =
-    lang === "en"
-      ? `Make 1 short keto dinner (500-650 kcal). Prefer: ${like}. Avoid: ${dislike}. Respond ONLY with one simple line like "Chicken with broccoli in butter (150 g chicken, 120 g broccoli)".`
-      : `Genera 1 cena keto corta (500-650 kcal). Prefiere: ${like}. Evita: ${dislike}. Responde SOLO con una línea así: "Pollo con brócoli en mantequilla (150 g pollo, 120 g brócoli)".`;
-
-  try {
-    const res = await fetch(GROK_PROXY, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, user: apiUser, pass: apiPass, mode: "dinner", lang })
-    });
-    const data = await res.json();
-    if (!data.ok) {
-      showToast(data.error || (lang === "en" ? "AI did not respond" : "IA no respondió"));
-      return;
-    }
-    let aiText = cleanAiDinnerText(data.text || "");
-    if (!aiText) {
-      showToast(lang === "en" ? "AI returned empty text" : "La IA devolvió texto vacío");
-      return;
-    }
-    const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
-    existing.cena = { nombre: aiText, qty: lang === "en" ? "AI dinner" : "Cena IA" };
-    localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
-
-    const week = Math.floor(idx / 7) + 1;
-    renderMenuDay(idx, week);
-    showToast(lang === "en" ? "AI dinner updated" : "Cena IA actualizada");
-  } catch (e) {
-    console.error(e);
-    showToast(appLang === "en" ? "Error calling AI" : "Error llamando a la IA");
+  if (lower.includes("frito") || lower.includes("manteca")) {
+    notes.push(appLang === "en" ? "Looks heavy, reduce fat." : "Se ve pesado, baja un poco la grasa.");
   }
+  if (lower.includes("papa") || lower.includes("arroz") || lower.includes("banana")) {
+    notes.push(appLang === "en" ? "Not very keto, swap carb." : "No muy keto, cambia ese carbo.");
+  }
+  if (!notes.length) return null;
+  return notes.join(" ");
 }
-window.generateDinnerAI = generateDinnerAI;
 
-// ====== IA: DESAYUNO / ALMUERZO / CENA (botón mini dentro de cada card) ======
+// ====== IA: DESAYUNO / ALMUERZO / CENA ======
 async function generateMealAI(idx, mealKey, week) {
   const like = localStorage.getItem(LS_LIKE) || "";
   const dislike = localStorage.getItem(LS_DISLIKE) || "";
   const lang = appLang;
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
-
   let mealNameES = "almuerzo";
   let mealNameEN = "lunch";
   if (mealKey === "desayuno") {
@@ -576,17 +699,40 @@ async function generateMealAI(idx, mealKey, week) {
     mealNameES = "cena";
     mealNameEN = "dinner";
   }
+  const baseDay = derivedPlan[idx];
 
+  // Si el usuario está en un día generado por IA, el botón debe funcionar igual.
+  // Ocultamos el grid de comidas base si existe y nos aseguramos que el contenedor IA esté visible.
+  const foodGrid = document.querySelector(`#day-${idx} .food-grid`);
+  const aiDayOutput = document.getElementById(`aiDayOutput-${idx}`);
+  if (foodGrid) foodGrid.style.display = 'none';
+  if (aiDayOutput && aiDayOutput.innerHTML === '') {
+      renderAiDay('', idx, `aiDayOutput-${idx}`); // Prepara el contenedor si está vacío
+  }
+
+  // --- CORRECCIÓN FINAL ---
+  // El backend SIEMPRE espera un campo "prompt", además de los otros datos.
+  // Creamos un prompt descriptivo y lo incluimos en el payload estructurado.
   const prompt =
     lang === "en"
-      ? `Create 1 short keto ${mealNameEN} (~350-600 kcal). Prefer: ${like}. Avoid: ${dislike}. Respond ONLY with one line like "Scrambled eggs with feta and avocado (2 eggs, 30 g feta, 1/2 avocado)".`
-      : `Genera 1 ${mealNameES} keto corto (~350-600 kcal). Prefiere: ${like}. Evita: ${dislike}. Responde SOLO con una línea así: "Huevos revueltos con feta y aguacate (2 huevos, 30 g feta, 1/2 aguacate)".`;
+      ? `Generate a single keto ${mealNameEN} meal. User likes: ${like}. User dislikes: ${dislike}.`
+      : `Genera una única comida keto de tipo ${mealNameES}. Al usuario le gusta: ${like}. Al usuario no le gusta: ${dislike}.`;
 
+  const payload = {
+    mode: mealKey, // 'desayuno', 'almuerzo', 'cena'
+    prompt, // El campo que faltaba y causaba el error "prompt required"
+    lang,
+    user: apiUser,
+    pass: apiPass,
+    kcal: baseDay.kcal,
+    prefs: { like, dislike },
+    dayIndex: idx + 1
+  };
   try {
     const res = await fetch(GROK_PROXY, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, user: apiUser, pass: apiPass, mode: mealKey, lang })
+      body: JSON.stringify(payload) // Enviamos el payload corregido
     });
     const data = await res.json();
     if (!data.ok) {
@@ -598,14 +744,31 @@ async function generateMealAI(idx, mealKey, week) {
       showToast(lang === "en" ? "AI returned empty text" : "La IA devolvió texto vacío");
       return;
     }
-    const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
-    existing[mealKey] = {
-      nombre: text,
-      qty: lang === "en" ? "AI " + mealNameEN : "IA " + mealNameES
-    };
-    localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
-    renderMenuDay(idx, week);
-    showToast(lang === "en" ? "AI meal updated" : "Comida IA actualizada");
+
+    // Lógica para actualizar el día IA en localStorage
+    const aiDayStored = localStorage.getItem(LS_AI_DAY_PREFIX + idx);
+    let dayData;
+    if (aiDayStored) {
+        dayData = JSON.parse(aiDayStored);
+    } else {
+        // Si no hay día IA, creamos uno a partir del plan base para no perder las otras comidas al generar la primera.
+        dayData = { rawText: `Desayuno: ${baseDay.desayuno.nombre}\nAlmuerzo: ${baseDay.almuerzo.nombre}\nCena: ${baseDay.cena.nombre}` };
+    }
+
+    // Reemplazamos la comida específica en el texto crudo y lo guardamos
+    const mealTitleES = mealKey === 'desayuno' ? 'Desayuno' : (mealKey === 'almuerzo' ? 'Almuerzo' : 'Cena');
+    const mealTitleEN = mealKey === 'desayuno' ? 'Breakfast' : (mealKey === 'almuerzo' ? 'Lunch' : 'Dinner');
+    const mealTitleRegex = new RegExp(`(${mealTitleES}|${mealTitleEN}):.*`, "i");
+
+    if (dayData.rawText.match(mealTitleRegex)) {
+        dayData.rawText = dayData.rawText.replace(mealTitleRegex, `${mealTitleES}: ${text}`);
+    } else {
+        dayData.rawText += `\n${mealTitleES}: ${text}`;
+    }
+    localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(dayData));
+
+    // En lugar de recargar todo, actualizamos solo la comida
+    renderSingleMeal(text, idx, mealKey);
   } catch (e) {
     console.error(e);
     showToast(appLang === "en" ? "Error calling AI" : "Error llamando a la IA");
@@ -646,28 +809,21 @@ async function generateFullDayAI(idx, week) {
       return;
     }
 
-    let structured = null;
-    if (data.structured) {
-      structured = data.structured;
-    } else if (data.text) {
-      try {
-        structured = JSON.parse(data.text);
-      } catch(e) {}
-    }
-
-    if (structured) {
-      const normalized = {
-        dia: baseDay.dia,
-        kcal: structured.kcal || baseDay.kcal,
-        macros: structured.macros || baseDay.macros,
-        desayuno: structured.desayuno || baseDay.desayuno,
-        snackAM: structured.snackAM || baseDay.snackAM,
-        almuerzo: structured.almuerzo || baseDay.almuerzo,
-        snackPM: structured.snackPM || baseDay.snackPM,
-        cena: structured.cena || baseDay.cena
+    const aiResponseText = data.text || "";
+    if (aiResponseText) {
+      // Guardamos el texto crudo para poder re-renderizarlo
+      const dayData = {
+        rawText: aiResponseText,
+        // Podríamos guardar más data estructurada si la API la devuelve
       };
-      localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(normalized));
-      renderMenuDay(idx, week);
+      localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(dayData));
+      
+      // Ocultamos el grid de comidas base y renderizamos el de la IA
+      const foodGrid = document.querySelector(`#day-${idx} .food-grid`);
+      if (foodGrid) {
+        foodGrid.style.display = 'none';
+      }
+      renderAiDay(aiResponseText, idx, `aiDayOutput-${idx}`);
       showToast(lang === "en" ? "Full AI day applied" : "Día IA aplicado");
     } else {
       showToast(lang === "en" ? "AI answered but was not structured" : "La IA respondió pero no en formato estructurado");
@@ -679,7 +835,175 @@ async function generateFullDayAI(idx, week) {
 }
 window.generateFullDayAI = generateFullDayAI;
 
-// ====== IA: WORKOUT DEL DÍA (FORMATO LIMPIO) ======
+/**
+ * =================================================================
+ * NUEVAS FUNCIONES DE RENDERIZADO PARA CONTENIDO IA
+ * =================================================================
+ */
+
+/**
+ * Parsea el texto plano de la IA y lo convierte en un array de objetos estructurados.
+ * @param {string} text - El texto completo generado por la IA para un día.
+ * @returns {Array<Object>} - Un array de objetos, cada uno representando una tarjeta (comida, tip, etc.).
+ */
+function parseAiDayContent(text) {
+  if (!text) return [];
+  const mealTypes = [
+    "Desayuno", "Snack AM", "Almuerzo", "Snack PM", "Cena", 
+    "Foco semanal", "Tip", "Nota", "Breakfast", "Lunch", "Dinner", "Weekly Focus", "Note"
+  ];
+  
+  const regex = new RegExp(`(${mealTypes.join('|')}):`, 'gi');
+  const parts = text.split(regex).filter(part => part.trim() !== '');
+
+  const structuredContent = [];
+  for (let i = 0; i < parts.length; i += 2) {
+    if (parts[i] && parts[i+1]) {
+      const title = parts[i].trim();
+      const description = parts[i+1].trim();
+      structuredContent.push({ title, description });
+    }
+  }
+  
+  if (structuredContent.length === 0 && text.trim().length > 0) {
+    return [{ title: 'Plan del Día', description: text.trim() }];
+  }
+
+  return structuredContent;
+}
+
+/**
+ * Convierte un objeto de comida/sección estructurado en una tarjeta HTML.
+ * @param {Object} item - Objeto con { title, description }.
+ * @param {number} day - El número del día (para asociar acciones IA).
+ * @returns {string} - El string HTML para la tarjeta.
+ */
+function createMealCardHTML(item, day) {
+  const { title, description } = item;
+  const lowerTitle = title.toLowerCase();
+
+  const icons = {
+    'desayuno': '🍳', 'breakfast': '🍳',
+    'almuerzo': '🥗', 'lunch': '🥗',
+    'cena': '🍲', 'dinner': '🍲',
+    'snack am': '🍎', 'snack pm': '🥜',
+    'foco semanal': '🎯', 'weekly focus': '🎯',
+    'tip': '💡',
+    'nota': '📝', 'note': '📝'
+  };
+  const icon = icons[lowerTitle] || '🍽️';
+
+  if (lowerTitle === 'tip' || lowerTitle === 'nota' || lowerTitle === 'note') {
+    return `<div class="meal-content"><p class="callout"><strong>${title}:</strong> ${description}</p></div>`;
+  }
+
+  return `
+    <div class="meal-card" data-meal-type="${lowerTitle}">
+      <div class="meal-header">
+        <span class="meal-icon">${icon}</span>
+        <strong>${title}</strong>
+        <button class="ia-btn small-btn" onclick="generateMealAI(${day}, '${lowerTitle}')" title="Generar nueva opción con IA">IA +</button>
+      </div>
+      <div class="meal-content">
+        <p>${description.replace(/\n/g, '<br>')}</p>
+      </div>
+    </div>
+  `;
+}
+
+function renderAiDay(aiResponseText, day, containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const structuredContent = parseAiDayContent(aiResponseText);
+  container.innerHTML = structuredContent.map(item => createMealCardHTML(item, day)).join('');
+}
+
+function renderSingleMeal(aiResponseText, day, mealType) {
+  const lowerMealType = mealType.toLowerCase();
+  const mealCard = document.querySelector(`#aiDayOutput-${day} .meal-card[data-meal-type="${lowerMealType}"]`);
+  
+  if (mealCard) {
+    const mealContent = mealCard.querySelector('.meal-content p');
+    if (mealContent) mealContent.innerHTML = aiResponseText.replace(/\n/g, '<br>');
+  } else {
+    // Si la tarjeta no existe (porque venimos de un plan base), recargamos el día completo.
+    // Esto asegura que la estructura de tarjetas IA se cree correctamente.
+    const aiDayStored = localStorage.getItem(LS_AI_DAY_PREFIX + day);
+    if (aiDayStored) {
+        const parsed = JSON.parse(aiDayStored);
+        renderAiDay(parsed.rawText, day, `aiDayOutput-${day}`);
+    }
+  }
+}
+
+// ====== IA: REVISAR DÍA (card bonita) ======
+async function reviewDayWithAI(idx, week) {
+  const lang = appLang;
+  const apiUser = localStorage.getItem(LS_API_USER) || "";
+  const apiPass = localStorage.getItem(LS_API_PASS) || "";
+  const day = getDayWithAI(idx);
+
+  const prompt =
+    lang === "en"
+      ? `You are reviewing a keto day. User has: breakfast "${day.desayuno?.nombre}", lunch "${day.almuerzo?.nombre}", dinner "${day.cena?.nombre}". Calories target: ${day.kcal}. Tell in 3 bullet points: (1) is it too fatty?, (2) is protein ok?, (3) 1 small tip. Keep it short.`
+      : `Estás revisando un día keto. El usuario tiene: desayuno "${day.desayuno?.nombre}", almuerzo "${day.almuerzo?.nombre}", cena "${day.cena?.nombre}". Meta calórica: ${day.kcal}. Responde en 3 bullets: (1) si está muy graso, (2) si la proteína está ok, (3) 1 tip corto.`;
+
+  try {
+    const res = await fetch(GROK_PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "review-day", user: apiUser, pass: apiPass, lang, prompt })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      showToast(data.error || (lang === "en" ? "AI did not respond" : "IA no respondió"));
+      return;
+    }
+
+    const reviewBox = document.getElementById("ai-review-" + idx);
+    if (reviewBox) {
+      const raw = (data.text || "").replace(/\*/g, "").trim();
+      let parts = raw.split(/\n| - |\u2022/g).map(t => t.trim()).filter(Boolean);
+      parts = parts.slice(0, 3);
+      if (!parts.length) {
+        parts = [raw];
+      }
+
+      reviewBox.innerHTML = `
+        <div class="ai-review-title">${lang === "en" ? "AI review of your day" : "Revisión IA de tu día"}</div>
+        <div class="ai-review-list">
+          ${parts
+            .map((txt, i) => {
+              const labelsES = ["Grasa", "Proteína", "Tip"];
+              const labelsEN = ["Fat", "Protein", "Tip"];
+              const label = lang === "en" ? labelsEN[i] || "Note" : labelsES[i] || "Nota";
+              const icons = ["🥑","🍗","💬"];
+              const icon = icons[i] || "•";
+              return `
+                <div class="ai-review-item">
+                  <div class="ai-review-icon">${icon}</div>
+                  <div class="ai-review-content">
+                    <h5>${label}</h5>
+                    <p>${txt}</p>
+                  </div>
+                </div>
+              `;
+            })
+            .join("")}
+        </div>
+      `;
+      reviewBox.style.display = "block";
+    }
+
+    showToast(lang === "en" ? "Day reviewed" : "Día revisado");
+  } catch (e) {
+    console.error(e);
+    showToast(appLang === "en" ? "Error calling AI" : "Error llamando a la IA");
+  }
+}
+window.reviewDayWithAI = reviewDayWithAI;
+
+// ====== WORKOUT IA ======
 function extractJSONSnippet(raw) {
   if (!raw) return null;
   const fence = raw.match(/```(?:json)?([\s\S]*?)```/i);
@@ -798,9 +1122,7 @@ async function generateWorkoutAI(idx, week) {
       }
     }
 
-    // guardar en localStorage para no perderlo
     localStorage.setItem(LS_AI_WORKOUT + idx, JSON.stringify(workouts));
-    // pintar
     renderWorkoutCardsFromArray(idx, workouts, lang);
 
     showToast(lang === "en" ? "Workout generated" : "Entreno generado");
@@ -810,6 +1132,154 @@ async function generateWorkoutAI(idx, week) {
   }
 }
 window.generateWorkoutAI = generateWorkoutAI;
+
+// ====== GENERAR SEMANA COMPLETA CON IA ======
+async function generateWeekWithAI(week) {
+  const start = (week - 1) * 7;
+  const end = Math.min(week * 7, derivedPlan.length);
+  for (let i = start; i < end; i++) {
+    await generateFullDayAI(i, week);
+  }
+  showToast(appLang === "en" ? "Week generated with AI" : "Semana generada con IA");
+}
+window.generateWeekWithAI = generateWeekWithAI;
+
+// ====== RENDERIZAR REVISIÓN SEMANAL GUARDADA ======
+function renderStoredWeekReview(week) {
+  const box = document.getElementById("aiWeekSummary");
+  if (!box) return;
+  const saved = localStorage.getItem(LS_AI_WEEK_PREFIX + week);
+  if (saved) {
+    box.innerHTML = saved;
+    box.style.display = "block";
+  } else {
+    box.innerHTML = "";
+    box.style.display = "none";
+  }
+}
+
+
+// ====== IA: REVISIÓN SEMANAL (NUEVO) ======
+async function reviewWeekWithAI() {
+  const lang = appLang;
+  const apiUser = localStorage.getItem(LS_API_USER) || "";
+  const apiPass = localStorage.getItem(LS_API_PASS) || "";
+  const selWeek = Number(localStorage.getItem(LS_SELECTED_WEEK)) || 1;
+
+  const startIdx = (selWeek - 1) * 7;
+  const weekDays = [];
+  for (let i = 0; i < 7; i++) {
+    const idx = startIdx + i;
+    const d = getDayWithAI(idx);
+    if (!d) continue;
+    weekDays.push({
+      name: d.dia || (lang === "en" ? `Day ${idx + 1}` : `Día ${idx + 1}`),
+      kcal: d.kcal || 0,
+      breakfast: d.desayuno ? d.desayuno.nombre : "",
+      lunch: d.almuerzo ? d.almuerzo.nombre : "",
+      dinner: d.cena ? d.cena.nombre : ""
+    });
+  }
+
+  const prompt =
+    lang === "en"
+      ? `You will receive a 7-day keto plan. Analyze consistency, days that deviated, and 1 recommendation for next week. Return exactly 3 short sections: 1) Consistency, 2) Deviations, 3) Recommendation. Here is the week: ${JSON.stringify(
+          weekDays
+        )}`
+      : `Vas a recibir un plan keto de 7 días. Analiza: 1) qué tan consistente fue, 2) qué días se desviaron, 3) una recomendación para la siguiente semana. Devuélvelo en 3 secciones cortas con título. Semana: ${JSON.stringify(
+          weekDays
+        )}`;
+
+  try {
+    const res = await fetch(GROK_PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: "review-week",
+        user: apiUser,
+        pass: apiPass,
+        lang,
+        prompt
+      })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      showToast(data.error || (lang === "en" ? "AI did not respond" : "IA no respondió"));
+      return;
+    }
+
+    const box = document.getElementById("aiWeekSummary");
+    if (box) {
+      // limpiamos los ### que trae la IA
+      const clean = (data.text || "").replace(/\*/g, "").replace(/###\s*/g, "").trim();
+      const parts = clean.split(/\n+/).filter(Boolean).slice(0, 4);
+
+      const html = `
+        <div class="ai-week-title">${lang === "en" ? "AI weekly review" : "Revisión IA de la semana"}</div>
+        <div class="ai-week-body">
+          ${parts
+            .map((t) => `<div class="ai-week-item">${t}</div>`)
+            .join("")}
+        </div>
+      `;
+
+      box.innerHTML = html;
+      box.style.display = "block";
+
+      // guardar esta revisión pero asociada a ESA semana
+      localStorage.setItem(LS_AI_WEEK_PREFIX + selWeek, html);
+    }
+
+    showToast(lang === "en" ? "Week reviewed" : "Semana revisada");
+  } catch (err) {
+    console.error(err);
+    showToast(lang === "en" ? "Error calling AI" : "Error llamando a la IA");
+  }
+}
+
+window.reviewWeekWithAI = reviewWeekWithAI;
+
+// ====== IA: MOTIVACIÓN DEL DÍA (NUEVO) ======
+async function motivateDayWithAI() {
+  const lang = appLang;
+  const apiUser = localStorage.getItem(LS_API_USER) || "";
+  const apiPass = localStorage.getItem(LS_API_PASS) || "";
+  const selDay = Number(localStorage.getItem(LS_SELECTED_DAY)) || 0;
+  const d = getDayWithAI(selDay);
+  const prompt =
+    lang === "en"
+      ? `Give me a short, energetic, second-person motivation message (max 35 words) for someone doing a keto plan. Mention today's meal very lightly and discipline.`
+      : `Dame un mensaje motivacional corto, en segunda persona, máximo 35 palabras, para alguien que está siguiendo un plan keto. Menciona muy ligero que ya tiene su menú y que siga disciplinado.`;
+
+  try {
+    const res = await fetch(GROK_PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: "motivation",
+        user: apiUser,
+        pass: apiPass,
+        lang,
+        prompt
+      })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      showToast(data.error || (lang === "en" ? "AI did not respond" : "IA no respondió"));
+      return;
+    }
+    const motBox = document.getElementById("motivation");
+    if (motBox) {
+      motBox.textContent = (data.text || "").replace(/\*/g, "").trim();
+      motBox.style.display = "block";
+    }
+    showToast(lang === "en" ? "Motivation ready" : "Motivación lista");
+  } catch (err) {
+    console.error(err);
+    showToast(lang === "en" ? "Error calling AI" : "Error llamando a la IA");
+  }
+}
+window.motivateDayWithAI = motivateDayWithAI;
 
 // ====== COMPRAS ======
 function renderCompras() {
@@ -851,7 +1321,10 @@ function renderCompras() {
       try {
         const parsed = JSON.parse(aiDay);
         ["desayuno","snackAM","almuerzo","snackPM","cena"].forEach(m => {
-          if (parsed[m] && parsed[m].qty) aiExtras.push(parsed[m].qty);
+          if (parsed[m] && parsed[m].qty) {
+            const ing = extractIngredientsFromQty(parsed[m].qty);
+            ing.forEach(x => aiExtras.push(x));
+          }
         });
       } catch(e) {}
     }
@@ -860,7 +1333,7 @@ function renderCompras() {
     const row = document.createElement("div");
     row.className = "list-row";
     row.innerHTML = `<strong>${appLang === "en" ? "AI extras" : "Extras IA"}</strong>
-    <div class="small">${aiExtras.join(" • ")}</div>`;
+    <div class="small ai-extras-inline">${aiExtras.join(" • ")}</div>`;
     container.appendChild(row);
   }
 
@@ -879,15 +1352,57 @@ function estimateBodyFat(heightCm, weightKg) {
   if (bf > 50) bf = 50;
   return bf.toFixed(1);
 }
-
 function estimateBMR(heightCm, weightKg, age, isMale = true) {
   const h = Number(heightCm);
   const w = Number(weightKg);
   const a = Number(age);
   if (!h || !w || !a) return null;
-  // Mifflin-St Jeor
   const base = 10 * w + 6.25 * h - 5 * a + (isMale ? 5 : -161);
   return Math.round(base);
+}
+
+// ====== GAMIFICACIÓN / LOGROS ======
+function computeHydrationStats() {
+  let daysWithWater = 0;
+  let totalMl = 0;
+  let totalGoal = 0;
+  for (let i = 0; i < derivedPlan.length; i++) {
+    const ws = getWaterState(i);
+    totalMl += ws.ml;
+    totalGoal += ws.goal;
+    if (ws.ml >= ws.goal * 0.8) {
+      daysWithWater++;
+    }
+  }
+  return {
+    daysWithWater,
+    totalMl,
+    totalGoal
+  };
+}
+function getStreak() {
+  // cuenta días completados seguidos desde el inicio
+  let streak = 0;
+  for (let i = 0; i < derivedPlan.length; i++) {
+    const done = localStorage.getItem(LS_PREFIX + "done-" + i) === "1";
+    if (done) streak++;
+    else break;
+  }
+  return streak;
+}
+function getAchievements() {
+  const ach = [];
+  const done = getCompletedCount();
+  const streak = getStreak();
+  const hydra = computeHydrationStats();
+
+  if (done >= 1) ach.push({id:"first-day", label: "🔥 Primer día completado"});
+  if (done >= 7) ach.push({id:"week-complete", label: "✅ 7 días dentro del plan"});
+  if (streak >= 3) ach.push({id:"streak-3", label: "📆 3 días seguidos"});
+  if (hydra.daysWithWater >= 3) ach.push({id:"water-3", label: "💧 3 días hidratado"});
+  if (hydra.daysWithWater >= 7) ach.push({id:"water-7", label: "💧 Pro de hidratación (7/7)"});
+
+  return ach;
 }
 
 // ====== PROGRESO ======
@@ -925,6 +1440,33 @@ function renderProgreso() {
     </div>
   `;
   container.appendChild(baseBox);
+
+  // gamificación / logros
+  const achBox = document.createElement("div");
+  achBox.className = "list-row";
+  const ach = getAchievements();
+  achBox.innerHTML = `
+    <strong>${appLang === "en" ? "Achievements" : "Logros"}</strong>
+    ${ach.length ? `<ul class="ach-list">${ach.map(a => `<li>${a.label}</li>`).join("")}</ul>` : `<p class="small">${appLang === "en" ? "Complete days, drink water and train to unlock badges." : "Completa días, toma agua y entrena para desbloquear insignias."}</p>`}
+  `;
+  container.appendChild(achBox);
+
+  // hidratación resumen
+  const hydra = computeHydrationStats();
+  const waterBox = document.createElement("div");
+  waterBox.className = "list-row";
+  waterBox.innerHTML = `
+    <strong>${appLang === "en" ? "Hydration" : "Hidratación"}</strong>
+    <p class="small">
+      ${appLang === "en" ? "Days with water goal reached: " : "Días con meta de agua: "}
+      ${hydra.daysWithWater} / ${derivedPlan.length}
+    </p>
+    <p class="small">
+      ${appLang === "en" ? "Total water logged: " : "Agua registrada: "}
+      ${hydra.totalMl} ml
+    </p>
+  `;
+  container.appendChild(waterBox);
 
   const shareBox = document.createElement("div");
   shareBox.className = "list-row";
@@ -1167,6 +1709,8 @@ function switchTab(target) {
       week = Math.floor(idx / 7) + 1;
     }
 
+    localStorage.setItem(LS_SELECTED_WEEK, String(week));
+
     if (!dailyView) {
       setWeekActive(week);
       renderDayPills(week);
@@ -1191,6 +1735,7 @@ function switchTab(target) {
     document.getElementById("dislikeFoods").value = localStorage.getItem(LS_DISLIKE) || "";
     document.getElementById("apiUser").value = localStorage.getItem(LS_API_USER) || "";
     document.getElementById("apiPass").value = localStorage.getItem(LS_API_PASS) || "";
+    document.getElementById("waterGoalInput").value = getDailyWaterGoal();
   }
 }
 document.querySelectorAll(".tab").forEach(tab => {
@@ -1200,13 +1745,21 @@ document.querySelectorAll(".bottom-btn").forEach(btn => {
   btn.addEventListener("click", () => switchTab(btn.dataset.tab));
 });
 document.addEventListener("click", e => {
-  if (e.target.classList.contains("week-btn")) {
+  const btn = e.target.closest(".week-btn");
+  if (btn) {
     document.querySelectorAll(".week-btn").forEach(b => b.classList.remove("active"));
-    e.target.classList.add("active");
-    const week = Number(e.target.dataset.week);
+    btn.classList.add("active");
+
+    const week = Number(btn.dataset.week);
+    localStorage.setItem(LS_SELECTED_WEEK, String(week));
+
     renderDayPills(week);
-    const idx = (week - 1) * 7;
-    renderMenuDay(idx, week);
+
+    const firstDayIndex = (week - 1) * 7;
+    localStorage.setItem(LS_SELECTED_DAY, String(firstDayIndex));
+    renderMenuDay(firstDayIndex, week);
+    // 👇 nuevo: mostrar revisión de esa semana si existe
+    renderStoredWeekReview(week);
   }
 });
 
@@ -1303,6 +1856,20 @@ function saveApiAccess() {
   showToast(appLang === "en" ? "API access saved" : "Acceso API guardado");
 }
 window.saveApiAccess = saveApiAccess;
+
+function saveWaterGoal() {
+  const val = Number(document.getElementById("waterGoalInput").value);
+  if (!val || val < 1000) {
+    showToast(appLang === "en" ? "Enter a valid amount" : "Pon una cantidad válida");
+    return;
+  }
+  localStorage.setItem(LS_WATER_GOAL, String(val));
+  showToast(appLang === "en" ? "Water goal saved" : "Meta de agua guardada");
+  const curIdx = Number(localStorage.getItem(LS_SELECTED_DAY)) || getCurrentDayIndex();
+  const curWeek = Number(localStorage.getItem(LS_SELECTED_WEEK)) || (Math.floor(curIdx / 7) + 1);
+  renderMenuDay(curIdx, curWeek);
+}
+window.saveWaterGoal = saveWaterGoal;
 
 // ====== ANIMACIONES ======
 function animateCards() {
@@ -1429,10 +1996,11 @@ function drawExerciseChart() {
 
   for (let idx = 0; idx < derivedPlan.length; idx++) {
     labels.push(derivedPlan[idx].dia);
-    planKcal.push(derivedPlan[idx].kcal || 1600);
+    planKcal.push(derivedPlan[idx].kcal || 0);
+
     const saved = JSON.parse(localStorage.getItem(LS_PROGRESS_PREFIX + idx) || "{}");
     exerciseKcal.push(saved.exkcal ? Number(saved.exkcal) : 0);
-    energy.push(saved.energia ? Number(saved.energia) : null);
+    energy.push(saved.energia ? Number(saved.energia) : 0);
   }
 
   if (exerciseChart) exerciseChart.destroy();
@@ -1442,35 +2010,37 @@ function drawExerciseChart() {
   const gridColor = isDark ? "rgba(226,232,240,.06)" : "rgba(15,23,42,.05)";
 
   exerciseChart = new Chart(ctx, {
-    type: "bar",
+    type: "line",
     data: {
       labels,
       datasets: [
         {
-          type: "line",
-          label: appLang === "en" ? "Plan kcal" : "Plan kcal",
+          label: appLang === "en" ? "Plan kcal" : "Kcal plan",
           data: planKcal,
+          borderWidth: 1.8,
           borderColor: getPrimaryColor(),
-          borderWidth: 2,
-          tension: .35,
-          pointRadius: 2,
-          yAxisID: "y"
-        },
-        {
-          label: appLang === "en" ? "Exercise kcal" : "Calorías ejercicio",
-          data: exerciseKcal,
           backgroundColor: getPrimaryColor(),
-          yAxisID: "y"
+          tension: .35,
+          pointRadius: 2.5
         },
         {
-          type: "line",
+          label: appLang === "en" ? "Exercise kcal" : "Kcal ejercicio",
+          data: exerciseKcal,
+          borderWidth: 1.8,
+          borderColor: "#38bdf8",
+          backgroundColor: "#38bdf8",
+          tension: .35,
+          pointRadius: 2.5
+        },
+        {
           label: appLang === "en" ? "Energy (1-10)" : "Energía (1-10)",
           data: energy,
+          borderWidth: 1.4,
           borderColor: "#f97316",
-          borderWidth: 2,
-          yAxisID: "y1",
-          tension: .35,
-          pointRadius: 2
+          backgroundColor: "#f97316",
+          tension: .3,
+          pointRadius: 2.5,
+          yAxisID: "y1"
         }
       ]
     },
@@ -1478,10 +2048,19 @@ function drawExerciseChart() {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { labels: { color: axisColor } }
+        legend: {
+          labels: {
+            color: axisColor,
+            usePointStyle: true,
+            boxWidth: 8
+          }
+        }
       },
       scales: {
-        x: { ticks: { color: axisColor }, grid: { color: gridColor } },
+        x: {
+          ticks: { color: axisColor, autoSkip: true, maxTicksLimit: 8 },
+          grid: { color: gridColor }
+        },
         y: {
           ticks: { color: axisColor },
           grid: { color: gridColor },
@@ -1489,59 +2068,73 @@ function drawExerciseChart() {
         },
         y1: {
           position: "right",
-          ticks: { color: axisColor, stepSize: 1, suggestedMin: 0, suggestedMax: 10 },
+          ticks: { color: axisColor },
           grid: { drawOnChartArea: false },
-          title: { display: true, text: appLang === "en" ? "Energy" : "Energía", color: axisColor, font: { size: 10 } }
+          title: { display: true, text: appLang === "en" ? "Energy" : "Energía", color: axisColor, font: { size: 10 } },
+          suggestedMin: 0,
+          suggestedMax: 10
         }
       }
     }
   });
 }
 
-// ====== INIT ======
-(function init() {
-  const savedPrimary = localStorage.getItem(LS_PRIMARY);
-  if (savedPrimary) {
-    document.documentElement.style.setProperty("--primary", savedPrimary);
-  }
+// ====== INICIALIZACIÓN ======
+function initApp() {
+  appLang = localStorage.getItem(LS_LANG) || "es";
+  currentWeeks = Number(localStorage.getItem(LS_PLAN_WEEKS)) || 2;
+  dailyView = Number(localStorage.getItem(LS_DAILY_VIEW)) || 0;
 
-  const savedLang = localStorage.getItem(LS_LANG);
-  appLang = savedLang || "es";
-
-  const savedWeeks = Number(localStorage.getItem(LS_PLAN_WEEKS) || "2");
-  currentWeeks = savedWeeks >= 2 && savedWeeks <= 4 ? savedWeeks : 2;
   derivedPlan = buildPlan(currentWeeks);
-
-  dailyView = Number(localStorage.getItem(LS_DAILY_VIEW) || "0");
-
-  const name = localStorage.getItem(LS_NAME) || "";
-  if (name) {
-    setHeaderName(name);
-    setRandomTip(name);
-  } else {
-    const modal = document.getElementById("nameModal");
-    if (modal) modal.style.display = "flex";
-    setRandomTip();
-  }
-
-  askStartDateIfNeeded();
   renderWeekButtons();
 
-  let idx = Number(localStorage.getItem(LS_SELECTED_DAY));
-  let week = Number(localStorage.getItem(LS_SELECTED_WEEK));
-  if (isNaN(idx) || idx < 0 || idx >= derivedPlan.length) {
-    idx = getCurrentDayIndex();
-  }
-  if (isNaN(week) || week < 1) {
-    week = Math.floor(idx / 7) + 1;
-  }
-
+  const idx = getCurrentDayIndex();
+  const week = Math.floor(idx / 7) + 1;
   if (!dailyView) {
     setWeekActive(week);
     renderDayPills(week);
   }
   renderMenuDay(idx, week);
+  renderStoredWeekReview(week); // 👈 nuevo
   updateProgressBar();
   showMotivation();
-  hideToast();
-})();
+
+  const savedName = localStorage.getItem(LS_NAME);
+  if (savedName) {
+    setHeaderName(savedName);
+  } else {
+    document.getElementById("nameModal").style.display = "flex";
+  }
+
+  const savedColor = localStorage.getItem(LS_PRIMARY);
+  if (savedColor) {
+    document.documentElement.style.setProperty("--primary", savedColor);
+  }
+
+  askStartDateIfNeeded();
+
+  // listener para el botón semanal IA y motivación IA
+  const weekBtn = document.getElementById("aiWeeklyReviewBtn");
+  if (weekBtn) {
+    weekBtn.addEventListener("click", () => {
+      weekBtn.classList.add("is-loading");
+      reviewWeekWithAI().finally(() => weekBtn.classList.remove("is-loading"));
+    });
+  }
+
+  const aiGlobal = document.querySelector(".ai-global-actions");
+  if (aiGlobal && !document.getElementById("aiMotivationBtn")) {
+    const btn = document.createElement("button");
+    btn.id = "aiMotivationBtn";
+    btn.className = "ia-btn ghost";
+    btn.textContent = "Motivar con IA 💬";
+    btn.addEventListener("click", () => {
+      btn.classList.add("is-loading");
+      motivateDayWithAI().finally(() => btn.classList.remove("is-loading"));
+    });
+    aiGlobal.appendChild(btn);
+  }
+
+  document.getElementById("splash-screen").classList.add("hide");
+}
+document.addEventListener("DOMContentLoaded", initApp);
