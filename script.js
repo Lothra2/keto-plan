@@ -520,6 +520,7 @@ function renderMenuDay(idx, week) {
   const done = localStorage.getItem(LS_PREFIX + "done-" + idx) === "1";
   const card = document.createElement("div");
   card.className = "day-card";
+  card.id = `day-${idx}`; // <-- CORRECCIÓN: Añadido ID para que los selectores funcionen.
 
   const dayIndexInWeek = (idx % 7);
   const workout = getWorkoutForDay(week, dayIndexInWeek);
@@ -710,7 +711,7 @@ async function generateMealAI(idx, mealKey, week) {
       renderAiDay('', idx, `aiDayOutput-${idx}`); // Prepara el contenedor si está vacío
   }
 
-  // --- CORRECCIÓN DEFINITIVA ---
+  // --- CORRECCIÓN FINAL (AHORA SÍ) ---
   // Usamos el formato de prompt del script anterior que sí funcionaba.
   // Este prompt es muy específico sobre el formato de la respuesta, lo cual es crucial.
   const prompt =
@@ -718,28 +719,38 @@ async function generateMealAI(idx, mealKey, week) {
       ? `Create 1 short keto ${mealNameEN} (~350-600 kcal). Prefer: ${like}. Avoid: ${dislike}. Respond ONLY with one line like "Scrambled eggs with feta and avocado (2 eggs, 30 g feta, 1/2 avocado)".`
       : `Genera 1 ${mealNameES} keto corto (~350-600 kcal). Prefiere: ${like}. Evita: ${dislike}. Responde SOLO con una línea así: "Huevos revueltos con feta y aguacate (2 huevos, 30 g feta, 1/2 aguacate)".`;
 
-  // El payload debe incluir el 'prompt' que el backend espera, junto con los otros datos.
+  // CORRECCIÓN: Usar un 'mode' fijo que el backend pueda reconocer y pasar el tipo de comida en otro campo.
   const payload = {
-    mode: mealKey, // 'desayuno', 'almuerzo', 'cena'
+    mode: "meal", // <-- Nombre fijo que el backend sí puede reconocer
+    meal: mealKey, // <-- Aquí se especifica qué comida es: desayuno/almuerzo/cena
     prompt,
     lang,
     user: apiUser,
-    pass: apiPass,
-    kcal: baseDay.kcal,
-    prefs: { like, dislike },
-    dayIndex: idx + 1
+    pass: apiPass
   };
+
   try {
     const res = await fetch(GROK_PROXY, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
-    const data = await res.json();
+
+    // CORRECCIÓN: Proteger el .json() por si la API devuelve un error HTML.
+    let data;
+    try {
+      data = await res.json();
+    } catch (err) {
+      console.error("Respuesta no JSON de la IA", err);
+      showToast(lang === "en" ? "AI did not respond" : "IA no respondió");
+      return;
+    }
+
     if (!data.ok) {
       showToast(data.error || (lang === "en" ? "AI did not respond" : "IA no respondió"));
       return;
     }
+
     let text = (data.text || "").replace(/\*\*/g, "").trim();
     if (!text) {
       showToast(lang === "en" ? "AI returned empty text" : "La IA devolvió texto vacío");
