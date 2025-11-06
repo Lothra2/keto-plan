@@ -1186,3 +1186,20 @@ input[type="date"] {
     padding: .35rem .2rem .4rem;
   }
 }
+
+.ia-tag {
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 0.9em;
+  background: rgba(34,197,94,0.1);
+  padding: 2px 6px;
+  border-radius: 6px;
+  margin-left: 4px;
+}
+
+.meal-note {
+  font-size: 0.8em;
+  color: var(--muted);
+  font-style: italic;
+  margin-top: 3px;
+}

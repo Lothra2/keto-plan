@@ -774,10 +774,11 @@ async function generateMealAI(idx, mealKey, week) {
     // - qty: la del plan base con kcal
     // - note: solo si hace falta
     existing[mealKey] = {
-      nombre: `${text} · IA ${mealNameES}`,
+      nombre: `${text} <span class="ia-tag">IA ${mealNameES}</span>`,
       qty: qtyWithKcal,
       ...(note ? { note } : {})
     };
+
 
     localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
     renderMenuDay(idx, week);
