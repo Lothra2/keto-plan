@@ -1186,3 +1186,55 @@ input[type="date"] {
     padding: .35rem .2rem .4rem;
   }
 }
+
+/* ============================
+   ESTILOS PARA TARJETAS DE COMIDA IA
+   ============================ */
+
+.meal-card {
+  background-color: rgba(15, 23, 42, 0.25);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 12px;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+  transition: background-color 0.3s, border-color 0.3s;
+}
+
+.meal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background-color: rgba(15, 23, 42, 0.2);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.meal-header strong {
+  flex-grow: 1;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.meal-icon {
+  font-size: 1.2rem;
+}
+
+.meal-content {
+  padding: 1rem;
+  color: var(--muted);
+}
+
+.meal-content p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.meal-content .callout {
+  background-color: rgba(15, 23, 42, 0.2);
+  border-left: 3px solid var(--primary);
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  border-radius: 0 8px 8px 0;
+  font-style: italic;
+  color: var(--text);
+}
