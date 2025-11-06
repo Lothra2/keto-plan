@@ -680,15 +680,24 @@ async function generateMealAI(idx, mealKey, week) {
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
 
-  // si no hay prefs guardadas, mostramos el tip local y no gastamos IA
-  if (!like && !dislike) {
-    const tip = localSmartTips[mealKey];
-    if (tip) {
-      showToast(tip, 2800);
-      return;
-    }
+  // ✅ PRIMERO: usar sugerencias locales si existen
+  // Antes este bloque dependía de si había o no preferencias (like/dislike),
+  // pero ahora los locales siempre tienen prioridad. Si existe un tip local,
+  // lo usamos directamente y no llamamos a la IA.
+  const tip = localSmartTips[mealKey];
+  if (tip) {
+    const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
+    existing[mealKey] = {
+      nombre: tip,
+      qty: lang === "en" ? "Local tip" : "Consejo local"
+    };
+    localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
+    renderMenuDay(idx, week);
+    showToast(lang === "en" ? "Used local suggestion" : "Usando sugerencia local");
+    return; // 👈 no llamar a la IA si hay tip local
   }
 
+  // 🔹 SI NO HAY TIP LOCAL → generar con IA
   let mealNameES = "almuerzo";
   let mealNameEN = "lunch";
   if (mealKey === "desayuno") {
@@ -709,24 +718,15 @@ async function generateMealAI(idx, mealKey, week) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        mode: "meal",          // 👈 modo fijo que tu función de Netlify sí puede mapear
-        meal: mealKey,         // 👈 aquí le dices cuál comida quieres: desayuno/almuerzo/cena
         prompt,
-        lang,
         user: apiUser,
-        pass: apiPass
+        pass: apiPass,
+        mode: mealKey, // 👈 volvemos al formato clásico: "desayuno" | "almuerzo" | "cena"
+        lang
       })
     });
 
-    let data;
-    try {
-      data = await res.json();
-    } catch (err) {
-      console.error("Respuesta no JSON de la IA", err);
-      showToast(lang === "en" ? "AI did not respond" : "IA no respondió");
-      return;
-    }
-
+    const data = await res.json();
     if (!data.ok) {
       showToast(data.error || (lang === "en" ? "AI did not respond" : "IA no respondió"));
       return;
@@ -738,7 +738,7 @@ async function generateMealAI(idx, mealKey, week) {
       return;
     }
 
-    // guardamos solo esa comida sobre el día
+    // Guardar comida IA generada
     const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
     const note = analyzeAIMeal(text);
     existing[mealKey] = {
@@ -756,7 +756,6 @@ async function generateMealAI(idx, mealKey, week) {
   }
 }
 window.generateMealAI = generateMealAI;
-
 
 // ====== IA: DÍA COMPLETO ======
 async function generateFullDayAI(idx, week) {
