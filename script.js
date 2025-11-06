@@ -90,6 +90,13 @@ const tipsEN = [
   "🧴 You can swap butter for olive oil."
 ];
 
+// tips locales para no gastar IA
+const localSmartTips = {
+  desayuno: "Tip: ya tienes un desayuno base, úsalo y guarda IA para el día completo 😉",
+  almuerzo: "Tip: puedes usar el almuerzo base y solo cambiar proteína.",
+  cena: "Tip: si solo quieres variar la cena, prueba el swap manual antes de usar IA."
+};
+
 // ====== WORKOUTS LOCALIZADOS ======
 const localizedWorkouts = {
   1: {
@@ -377,6 +384,49 @@ function computeDynamicMacros(day, calState) {
   };
 }
 
+// ====== EXTRAS IA POR DÍA ======
+function extractIngredientsFromQty(qty) {
+  if (!qty) return [];
+  // separar por coma o •
+  return qty
+    .split(/,|•/g)
+    .map(t => t.trim())
+    .filter(Boolean)
+    .map(t => t.replace(/\s+/g, " "));
+}
+function collectAIExtrasForDay(idx) {
+  const extras = [];
+  const aiDay = localStorage.getItem(LS_AI_DAY_PREFIX + idx);
+  if (!aiDay) return extras;
+  try {
+    const parsed = JSON.parse(aiDay);
+    ["desayuno","snackAM","almuerzo","snackPM","cena"].forEach(m => {
+      if (parsed[m] && parsed[m].qty) {
+        const ing = extractIngredientsFromQty(parsed[m].qty);
+        ing.forEach(x => extras.push(x));
+      }
+    });
+  } catch(e) {}
+  return extras;
+}
+function renderAIExtras(idx) {
+  const cont = document.getElementById("ai-extras-" + idx);
+  if (!cont) return;
+  const extras = collectAIExtrasForDay(idx);
+  if (!extras.length) {
+    cont.style.display = "none";
+    cont.innerHTML = "";
+    return;
+  }
+  cont.style.display = "flex";
+  cont.innerHTML = `
+    <div class="ai-extras-title">${appLang === "en" ? "AI extras for today" : "Extras IA para hoy"}</div>
+    <div class="ai-extras-chips">
+      ${extras.map(e => `<span class="ai-chip">+ ${e}</span>`).join("")}
+    </div>
+  `;
+}
+
 // ====== MENÚ DÍA ======
 function renderMenuDay(idx, week) {
   // recordar selección
@@ -424,6 +474,7 @@ function renderMenuDay(idx, week) {
       ${buildMealBlock(idx, week, "snackPM", "🥜 " + (appLang === "en" ? "Snack PM" : "Snack PM"), day.snackPM, calState.meals.snackPM)}
       ${buildMealBlock(idx, week, "cena", "🍖 " + (appLang === "en" ? "Dinner" : "Cena"), day.cena, calState.meals.cena, true)}
     </div>
+    <div class="ai-extras-box" id="ai-extras-${idx}" style="display:none"></div>
     <div class="workout-box">
       <strong>${appLang === "en" ? "Weekly focus" : "Foco semanal"}:</strong>
       <p class="small">${workout.focus}</p>
@@ -439,6 +490,9 @@ function renderMenuDay(idx, week) {
       <button class="ia-btn" onclick="generateFullDayAI(${idx}, ${week})">
         ${appLang === "en" ? "Full day AI 📅" : "Día completo IA 📅"}
       </button>
+      <button class="ia-btn ghost-btn" onclick="reviewDayWithAI(${idx}, ${week})">
+        ${appLang === "en" ? "Review IA" : "Revisar IA"}
+      </button>
     </div>
   `;
   menuDays.appendChild(card);
@@ -452,6 +506,8 @@ function renderMenuDay(idx, week) {
     } catch (e) {}
   }
 
+  renderAIExtras(idx);
+
   animateCards();
   document.querySelectorAll(".day-pill").forEach((p, i) => {
     const base = (week - 1) * 7;
@@ -462,6 +518,7 @@ function renderMenuDay(idx, week) {
 function buildMealBlock(idx, week, key, title, mealObj, done, isDinner = false) {
   const qty = mealObj && mealObj.qty ? mealObj.qty : "";
   const name = mealObj && mealObj.nombre ? mealObj.nombre : "";
+  const note = mealObj && mealObj.note ? mealObj.note : "";
 
   const canIA = (key === "desayuno" || key === "almuerzo" || key === "cena");
 
@@ -478,6 +535,7 @@ function buildMealBlock(idx, week, key, title, mealObj, done, isDinner = false) 
         </div>
       </div>
       <div class="meal-name" ${isDinner ? 'id="cena-text"' : ""}>${name}</div>
+      ${note ? `<p class="meal-note">${note}</p>` : ""}
     </div>
   `;
 }
@@ -493,16 +551,6 @@ function toggleDone(idx, week) {
 }
 window.toggleDone = toggleDone;
 
-// ====== SWAP CENA MANUAL ======
-function swapCena(idx, week) {
-  const option = cenaSwaps[Math.floor(Math.random() * cenaSwaps.length)];
-  const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
-  existing.cena = { nombre: option.nombre, qty: option.qty };
-  localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
-  renderMenuDay(idx, week);
-}
-window.swapCena = swapCena;
-
 // ====== LIMPIAR TEXTO CENA IA ======
 function cleanAiDinnerText(raw) {
   if (!raw) return "";
@@ -516,48 +564,23 @@ function cleanAiDinnerText(raw) {
   return text;
 }
 
-// ====== IA: DINNER (botón separado) ======
-async function generateDinnerAI(idx) {
-  const like = localStorage.getItem(LS_LIKE) || "";
-  const dislike = localStorage.getItem(LS_DISLIKE) || "";
-  const lang = appLang;
-  const apiUser = localStorage.getItem(LS_API_USER) || "";
-  const apiPass = localStorage.getItem(LS_API_PASS) || "";
-
-  const prompt =
-    lang === "en"
-      ? `Make 1 short keto dinner (500-650 kcal). Prefer: ${like}. Avoid: ${dislike}. Respond ONLY with one simple line like "Chicken with broccoli in butter (150 g chicken, 120 g broccoli)".`
-      : `Genera 1 cena keto corta (500-650 kcal). Prefiere: ${like}. Evita: ${dislike}. Responde SOLO con una línea así: "Pollo con brócoli en mantequilla (150 g pollo, 120 g brócoli)".`;
-
-  try {
-    const res = await fetch(GROK_PROXY, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, user: apiUser, pass: apiPass, mode: "dinner", lang })
-    });
-    const data = await res.json();
-    if (!data.ok) {
-      showToast(data.error || (lang === "en" ? "AI did not respond" : "IA no respondió"));
-      return;
-    }
-    let aiText = cleanAiDinnerText(data.text || "");
-    if (!aiText) {
-      showToast(lang === "en" ? "AI returned empty text" : "La IA devolvió texto vacío");
-      return;
-    }
-    const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
-    existing.cena = { nombre: aiText, qty: lang === "en" ? "AI dinner" : "Cena IA" };
-    localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
-
-    const week = Math.floor(idx / 7) + 1;
-    renderMenuDay(idx, week);
-    showToast(lang === "en" ? "AI dinner updated" : "Cena IA actualizada");
-  } catch (e) {
-    console.error(e);
-    showToast(appLang === "en" ? "Error calling AI" : "Error llamando a la IA");
+// ====== ANALIZADOR RÁPIDO DE COMIDA IA ======
+function analyzeAIMeal(text) {
+  if (!text) return null;
+  const lower = text.toLowerCase();
+  const notes = [];
+  if (lower.includes("mantequilla") || lower.includes("crema") || lower.includes("queso") || lower.includes("cheese")) {
+    notes.push(appLang === "en" ? "High in dairy, adjust if needed." : "Tiene lácteos, ajusta si quieres.");
   }
+  if (lower.includes("frito") || lower.includes("manteca")) {
+    notes.push(appLang === "en" ? "Looks heavy, reduce fat." : "Se ve pesado, baja un poco la grasa.");
+  }
+  if (lower.includes("papa") || lower.includes("arroz") || lower.includes("banana")) {
+    notes.push(appLang === "en" ? "Not very keto, swap carb." : "No muy keto, cambia ese carbo.");
+  }
+  if (!notes.length) return null;
+  return notes.join(" ");
 }
-window.generateDinnerAI = generateDinnerAI;
 
 // ====== IA: DESAYUNO / ALMUERZO / CENA (botón mini dentro de cada card) ======
 async function generateMealAI(idx, mealKey, week) {
@@ -566,6 +589,15 @@ async function generateMealAI(idx, mealKey, week) {
   const lang = appLang;
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
+
+  // tip local para no gastar IA si no hay preferencias
+  if (!like && !dislike) {
+    const tip = localSmartTips[mealKey];
+    if (tip) {
+      showToast(tip, 2800);
+      return;
+    }
+  }
 
   let mealNameES = "almuerzo";
   let mealNameEN = "lunch";
@@ -599,9 +631,11 @@ async function generateMealAI(idx, mealKey, week) {
       return;
     }
     const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
+    const note = analyzeAIMeal(text);
     existing[mealKey] = {
       nombre: text,
-      qty: lang === "en" ? "AI " + mealNameEN : "IA " + mealNameES
+      qty: lang === "en" ? "AI " + mealNameEN : "IA " + mealNameES,
+      ...(note ? { note } : {})
     };
     localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
     renderMenuDay(idx, week);
@@ -678,6 +712,40 @@ async function generateFullDayAI(idx, week) {
   }
 }
 window.generateFullDayAI = generateFullDayAI;
+
+// ====== IA: REVISAR DÍA SIN REEMPLAZAR ======
+async function reviewDayWithAI(idx, week) {
+  const lang = appLang;
+  const apiUser = localStorage.getItem(LS_API_USER) || "";
+  const apiPass = localStorage.getItem(LS_API_PASS) || "";
+  const day = getDayWithAI(idx);
+
+  const prompt =
+    lang === "en"
+      ? `You are reviewing a keto day. User has: breakfast "${day.desayuno?.nombre}", lunch "${day.almuerzo?.nombre}", dinner "${day.cena?.nombre}". Calories target: ${day.kcal}. Tell in 3 bullet points: (1) is it too fatty?, (2) is protein ok?, (3) 1 small tip. Keep it short.`
+      : `Estás revisando un día keto. El usuario tiene: desayuno "${day.desayuno?.nombre}", almuerzo "${day.almuerzo?.nombre}", cena "${day.cena?.nombre}". Meta calórica: ${day.kcal}. Responde en 3 bullets: (1) si está muy graso, (2) si la proteína está ok, (3) 1 tip corto.`;
+
+  try {
+    const res = await fetch(GROK_PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "review-day", user: apiUser, pass: apiPass, lang, prompt })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      showToast(data.error || (lang === "en" ? "AI did not respond" : "IA no respondió"));
+      return;
+    }
+    // mostramos en el tipBox para visibilidad
+    const tipBox = document.getElementById("tipBox");
+    tipBox.textContent = (data.text || "").replace(/\*/g, "").trim();
+    showToast(lang === "en" ? "Day reviewed" : "Día revisado");
+  } catch (e) {
+    console.error(e);
+    showToast(appLang === "en" ? "Error calling AI" : "Error llamando a la IA");
+  }
+}
+window.reviewDayWithAI = reviewDayWithAI;
 
 // ====== IA: WORKOUT DEL DÍA (FORMATO LIMPIO) ======
 function extractJSONSnippet(raw) {
@@ -798,9 +866,7 @@ async function generateWorkoutAI(idx, week) {
       }
     }
 
-    // guardar en localStorage para no perderlo
     localStorage.setItem(LS_AI_WORKOUT + idx, JSON.stringify(workouts));
-    // pintar
     renderWorkoutCardsFromArray(idx, workouts, lang);
 
     showToast(lang === "en" ? "Workout generated" : "Entreno generado");
@@ -810,6 +876,17 @@ async function generateWorkoutAI(idx, week) {
   }
 }
 window.generateWorkoutAI = generateWorkoutAI;
+
+// ====== GENERAR SEMANA COMPLETA CON IA ======
+async function generateWeekWithAI(week) {
+  const start = (week - 1) * 7;
+  const end = Math.min(week * 7, derivedPlan.length);
+  for (let i = start; i < end; i++) {
+    await generateFullDayAI(i, week);
+  }
+  showToast(appLang === "en" ? "Week generated with AI" : "Semana generada con IA");
+}
+window.generateWeekWithAI = generateWeekWithAI;
 
 // ====== COMPRAS ======
 function renderCompras() {
@@ -844,6 +921,7 @@ function renderCompras() {
     container.appendChild(row);
   });
 
+  // extras IA agrupados pero SÓLO como referencia
   const aiExtras = [];
   for (let idx = 0; idx < derivedPlan.length; idx++) {
     const aiDay = localStorage.getItem(LS_AI_DAY_PREFIX + idx);
@@ -851,7 +929,10 @@ function renderCompras() {
       try {
         const parsed = JSON.parse(aiDay);
         ["desayuno","snackAM","almuerzo","snackPM","cena"].forEach(m => {
-          if (parsed[m] && parsed[m].qty) aiExtras.push(parsed[m].qty);
+          if (parsed[m] && parsed[m].qty) {
+            const ing = extractIngredientsFromQty(parsed[m].qty);
+            ing.forEach(x => aiExtras.push(x));
+          }
         });
       } catch(e) {}
     }
@@ -860,7 +941,7 @@ function renderCompras() {
     const row = document.createElement("div");
     row.className = "list-row";
     row.innerHTML = `<strong>${appLang === "en" ? "AI extras" : "Extras IA"}</strong>
-    <div class="small">${aiExtras.join(" • ")}</div>`;
+    <div class="small ai-extras-inline">${aiExtras.join(" • ")}</div>`;
     container.appendChild(row);
   }
 
@@ -885,7 +966,6 @@ function estimateBMR(heightCm, weightKg, age, isMale = true) {
   const w = Number(weightKg);
   const a = Number(age);
   if (!h || !w || !a) return null;
-  // Mifflin-St Jeor
   const base = 10 * w + 6.25 * h - 5 * a + (isMale ? 5 : -161);
   return Math.round(base);
 }
@@ -1544,4 +1624,21 @@ function drawExerciseChart() {
   updateProgressBar();
   showMotivation();
   hideToast();
+
+  // botones globales IA
+  const reviewBtn = document.getElementById("aiReviewDayBtn");
+  if (reviewBtn) {
+    reviewBtn.addEventListener("click", () => {
+      const curIdx = Number(localStorage.getItem(LS_SELECTED_DAY)) || getCurrentDayIndex();
+      const curWeek = Number(localStorage.getItem(LS_SELECTED_WEEK)) || (Math.floor(curIdx / 7) + 1);
+      reviewDayWithAI(curIdx, curWeek);
+    });
+  }
+  const weekBtn = document.getElementById("aiGenerateWeekBtn");
+  if (weekBtn) {
+    weekBtn.addEventListener("click", () => {
+      const curWeek = Number(localStorage.getItem(LS_SELECTED_WEEK)) || 1;
+      generateWeekWithAI(curWeek);
+    });
+  }
 })();
