@@ -10,7 +10,14 @@
   --radius: 1.05rem;
   --danger: #ef4444;
   --success: #22c55e;
+
+  /* colores para gráficas en dark */
+  --chart-line: #22c55e;
+  --chart-fill: rgba(34,197,94,.12);
+  --chart-grid: rgba(226,232,240,.08);
+  --chart-text: #e2e8f0;
 }
+
 [data-theme="light"] {
   --bg: #f1f5f9;
   --bg-soft: #e2e8f0;
@@ -18,11 +25,18 @@
   --card-soft: rgba(255,255,255,.5);
   --text: #0f172a;
   --muted: rgba(15,23,42,.55);
+
+  /* mismos colores pero pensados para fondo claro */
+  --chart-line: #0f766e;
+  --chart-fill: rgba(15,118,110,.12);
+  --chart-grid: rgba(15,23,42,.08);
+  --chart-text: #0f172a;
 }
 
 /* BASE */
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 body {
   margin: 0;
@@ -35,6 +49,10 @@ body {
   min-height: 100vh;
   padding-bottom: 70px;
   transition: background .25s ease, color .25s ease;
+  overflow-x: hidden;
+}
+html {
+  scroll-behavior: smooth;
 }
 
 /* SPLASH */
@@ -437,6 +455,7 @@ input:checked + .ball::after {
   font-size: .7rem;
   margin-bottom: .55rem;
   box-shadow: 0 10px 30px rgba(0,0,0,.05);
+  overflow: hidden;
 }
 [data-theme="light"] .list-row {
   background: rgba(255,255,255,.7);
@@ -446,7 +465,7 @@ input:checked + .ball::after {
   opacity: .85;
 }
 
-/* INPUTS */
+/* INPUTS (general, incluyendo ajustes) */
 input, textarea, select {
   width: 100%;
   background: rgba(15,23,42,.2);
@@ -462,13 +481,27 @@ input, textarea, select {
 input:focus, textarea:focus, select:focus {
   border: 1px solid rgba(15,118,110,.7);
 }
-.list-row input[type="date"] {
+
+/* FIX CAMPO DE FECHA EN MOVIL */
+input[type="date"] {
   width: 100%;
   min-width: 0;
+  box-sizing: border-box;
+  font-size: .72rem;
+  padding: .5rem .45rem;
+  border-radius: .5rem;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: rgba(255,255,255,.03);
 }
-.list-row {
-  overflow: hidden;
+@supports (-webkit-touch-callout: none) {
+  /* iPhone/Safari: súbele un poquito el font-size para que no haga zoom raro */
+  input[type="date"] {
+    font-size: .78rem;
+  }
 }
+
 .save-btn {
   width: 100%;
   background: var(--primary);
@@ -584,7 +617,7 @@ input:focus, textarea:focus, select:focus {
   transform: translateX(-50%) translateY(0);
 }
 
-/* PROGRESO */
+/* PROGRESO – contraste mejorado para la gráfica */
 #progreso .day-card {
   background: var(--card);
   background-image: none;
@@ -593,10 +626,19 @@ input:focus, textarea:focus, select:focus {
 #progreso .list-row {
   background: var(--card);
 }
+#progreso .chart-box {
+  background: rgba(15,23,42,.25);
+  border: 1px solid rgba(226,232,240,.05);
+  border-radius: .6rem;
+  padding: .4rem .4rem .35rem;
+  margin-top: .45rem;
+}
 #progreso canvas {
-  background: rgba(15,23,42,.05);
+  background: rgba(15,23,42,.35);
   border-radius: .6rem;
   margin-top: .4rem;
+  border: 1px solid rgba(226,232,240,.04);
+  max-width: 100%;
 }
 .prog-resumen {
   margin-top: .4rem;
@@ -622,5 +664,21 @@ input:focus, textarea:focus, select:focus {
   }
   .tabs {
     top: 64px;
+  }
+}
+
+/* MOBILE EXTRA */
+@media (max-width: 420px) {
+  header h1 {
+    font-size: 1rem;
+  }
+  .list-row {
+    padding: .5rem .5rem .35rem;
+  }
+  input, select {
+    font-size: .7rem;
+  }
+  input[type="date"] {
+    font-size: .75rem;
   }
 }
