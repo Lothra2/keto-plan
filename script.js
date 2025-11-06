@@ -1410,6 +1410,8 @@ function switchTab(target) {
       week = Math.floor(idx / 7) + 1;
     }
 
+    localStorage.setItem(LS_SELECTED_WEEK, String(week));
+    
     if (!dailyView) {
       setWeekActive(week);
       renderDayPills(week);
@@ -1444,15 +1446,18 @@ document.querySelectorAll(".bottom-btn").forEach(btn => {
   btn.addEventListener("click", () => switchTab(btn.dataset.tab));
 });
 document.addEventListener("click", e => {
-  if (e.target.classList.contains("week-btn")) {
+  const btn = e.target.closest(".week-btn");
+  if (btn) {
     document.querySelectorAll(".week-btn").forEach(b => b.classList.remove("active"));
-    e.target.classList.add("active");
-    const week = Number(e.target.dataset.week);
+    btn.classList.add("active");
+    const week = Number(btn.dataset.week);
+    localStorage.setItem(LS_SELECTED_WEEK, String(week));
     renderDayPills(week);
-    const idx = (week - 1) * 7;
-    renderMenuDay(idx, week);
+    const savedIdx = Number(localStorage.getItem(LS_SELECTED_DAY)) || (week - 1) * 7;
+    renderMenuDay(savedIdx, week);
   }
 });
+
 
 // ====== THEME ======
 const themeToggle = document.getElementById("themeToggle");
