@@ -680,14 +680,43 @@ async function generateMealAI(idx, mealKey, week) {
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
 
-  // Día base → mantener cantidades y kcal originales
+  // día base para mantener estructura
   const baseDay = derivedPlan[idx];
   const baseMeal = baseDay[mealKey] || {};
   const baseQty = baseMeal.qty || "";
   const mealPercent = mealPercents[mealKey] || 0;
   const mealKcal = mealPercent ? Math.round((baseDay.kcal || 1600) * mealPercent) : null;
+  const qtyWithKcal = mealKcal
+    ? (baseQty ? `${baseQty} • ~${mealKcal} kcal` : `~${mealKcal} kcal`)
+    : baseQty;
 
-  // Nombre de la comida
+  // lo que ya hay guardado
+  let existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
+  let hasMeal = !!existing[mealKey];
+
+  // --- 1) tip local (solo si no hay nada y no choca) ---
+  const tip = localSmartTips[mealKey];
+  const tipLower = tip ? tip.toLowerCase() : "";
+  const userDislikeLower = dislike.toLowerCase();
+  const tipConflicts =
+    tipLower && userDislikeLower
+      ? userDislikeLower.split(",").some(d => d.trim() && tipLower.includes(d.trim()))
+      : false;
+
+  if (tip && !hasMeal && !tipConflicts) {
+    // mantener estructura base, solo agregamos nota
+    existing[mealKey] = {
+      nombre: (baseMeal.nombre || mealKey.toUpperCase()) + " (IA)",
+      qty: qtyWithKcal,
+      note: tip
+    };
+    localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
+    renderMenuDay(idx, week);
+    showToast(lang === "en" ? "Used local suggestion" : "Usando sugerencia local");
+    return;
+  }
+
+  // --- 2) IA ---
   let mealNameES = "almuerzo";
   let mealNameEN = "lunch";
   if (mealKey === "desayuno") {
@@ -698,11 +727,10 @@ async function generateMealAI(idx, mealKey, week) {
     mealNameEN = "dinner";
   }
 
-  // Prompt IA: nombre corto del plato
   const prompt =
     lang === "en"
-      ? `Create ONE short keto ${mealNameEN} (~350-600 kcal). Prefer: ${like}. Avoid: ${dislike}. Reply ONLY with the dish name, no explanation, no list.`
-      : `Genera UN solo ${mealNameES} keto corto (~350-600 kcal). Prefiere: ${like}. Evita: ${dislike}. Responde SOLO con el nombre del plato, sin explicación ni lista.`;
+      ? `Create 1 short keto ${mealNameEN} (~350-600 kcal). Prefer: ${like}. Avoid: ${dislike}. Respond ONLY with a short dish name, no explanation.`
+      : `Genera 1 ${mealNameES} keto corto (~350-600 kcal). Prefiere: ${like}. Evita: ${dislike}. Responde SOLO con el nombre del plato, sin explicación.`;
 
   try {
     const res = await fetch(GROK_PROXY, {
@@ -723,11 +751,14 @@ async function generateMealAI(idx, mealKey, week) {
       return;
     }
 
+    // limpiamos el texto de la IA
     let text = (data.text || "").replace(/\*\*/g, "").trim();
+    // quedarnos solo con la primera línea / primera oración
     if (text.includes("\n")) text = text.split("\n")[0].trim();
     if (text.includes(".")) {
       const first = text.split(".")[0].trim();
-      if (first.length > 6) text = first;
+      // si la primera frase tiene sentido, la usamos
+      if (first.length > 10) text = first;
     }
 
     if (!text) {
@@ -735,18 +766,16 @@ async function generateMealAI(idx, mealKey, week) {
       return;
     }
 
-    // Nota (lácteos, etc.)
+    // revisar lácteos u otros ingredientes
     const note = analyzeAIMeal(text);
 
-    // Guardar estructura final
-    const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
+    // 👇 aquí viene lo importante:
+    // - nombre: lo que diga la IA + "(IA)"
+    // - qty: la del plan base con kcal
+    // - note: solo si hace falta
     existing[mealKey] = {
-      nombre: text, // nombre del plato IA
-      // cantidades base + marca IA y kcal
-      qty:
-        (baseQty
-          ? `${baseQty} • IA ${mealNameES}`
-          : `IA ${mealNameES}`) + (mealKcal ? ` • ~${mealKcal} kcal` : ""),
+      nombre: `${text} · IA ${mealNameES}`,
+      qty: qtyWithKcal,
       ...(note ? { note } : {})
     };
 
@@ -759,6 +788,8 @@ async function generateMealAI(idx, mealKey, week) {
   }
 }
 window.generateMealAI = generateMealAI;
+
+
 
 // ====== IA: DÍA COMPLETO ======
 async function generateFullDayAI(idx, week) {

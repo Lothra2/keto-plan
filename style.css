@@ -1186,10 +1186,3 @@ input[type="date"] {
     padding: .35rem .2rem .4rem;
   }
 }
-
-.day-card .meal-note {
-  font-size: 0.82rem;
-  font-style: italic;
-  opacity: 0.8;
-  margin-top: 0.25rem;
-}
