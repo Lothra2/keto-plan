@@ -710,11 +710,17 @@ async function generateMealAI(idx, mealKey, week) {
       renderAiDay('', idx, `aiDayOutput-${idx}`); // Prepara el contenedor si está vacío
   }
 
-  // --- CORRECCIÓN CLAVE ---
-  // Construimos un payload estructurado, igual que en las otras funciones de IA.
-  // El backend espera este formato, no un prompt simple.
+  // --- CORRECCIÓN FINAL ---
+  // El backend SIEMPRE espera un campo "prompt", además de los otros datos.
+  // Creamos un prompt descriptivo y lo incluimos en el payload estructurado.
+  const prompt =
+    lang === "en"
+      ? `Generate a single keto ${mealNameEN} meal. User likes: ${like}. User dislikes: ${dislike}.`
+      : `Genera una única comida keto de tipo ${mealNameES}. Al usuario le gusta: ${like}. Al usuario no le gusta: ${dislike}.`;
+
   const payload = {
     mode: mealKey, // 'desayuno', 'almuerzo', 'cena'
+    prompt, // El campo que faltaba y causaba el error "prompt required"
     lang,
     user: apiUser,
     pass: apiPass,
@@ -722,7 +728,6 @@ async function generateMealAI(idx, mealKey, week) {
     prefs: { like, dislike },
     dayIndex: idx + 1
   };
-
   try {
     const res = await fetch(GROK_PROXY, {
       method: "POST",
