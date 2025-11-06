@@ -656,14 +656,52 @@ async function generateFullDayAI(idx, week) {
 window.generateFullDayAI = generateFullDayAI;
 
 // ====== IA: WORKOUT DEL DÍA (FORMATO LIMPIO) ======
+// Este helper trata de sacar SOLO el JSON aunque la IA hable mucho
+function extractJSONSnippet(raw) {
+  if (!raw) return null;
+  // buscar ```json ... ```
+  const fence = raw.match(/```(?:json)?([\s\S]*?)```/i);
+  if (fence && fence[1]) {
+    return fence[1].trim();
+  }
+  // si no, busca el primer { y el último }
+  const first = raw.indexOf("{");
+  const last = raw.lastIndexOf("}");
+  if (first !== -1 && last !== -1 && last > first) {
+    return raw.slice(first, last + 1).trim();
+  }
+  return null;
+}
+
+function normalizeWorkoutArray(arr, lang) {
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .map(it => {
+      return {
+        nombre: it.nombre || it.name || "",
+        series: it.series || it.reps || (lang === "en" ? "3 sets" : "3 series"),
+        descripcion: it.descripcion || it.desc || ""
+      };
+    })
+    .filter(it => it.nombre)
+    .slice(0, 6);
+}
+
 function parseWorkoutTextToClean(raw, lang) {
   // fallback por si la IA no devuelve JSON
-  const lines = (raw || "").split("\n").map(l => l.trim()).filter(Boolean);
-  return lines.map((l, i) => ({
-    nombre: l.replace(/^\d+[\).\-\s]*/, "").replace(/^\-\s*/, ""),
+  const lines = (raw || "")
+    .split("\n")
+    .map(l => l.trim())
+    .filter(Boolean)
+    // quitar líneas intro tipo "Aquí tienes el JSON..."
+    .filter(l => !/aquí tienes|here is/i.test(l))
+    .filter(l => !/^```/.test(l));
+
+  return lines.map((l) => ({
+    nombre: l.replace(/^\d+[\).\-\s]*/, "").replace(/^\-\s*/, "").replace(/^\{\s*"?/, "").replace(/"?\}\s*$/, ""),
     series: lang === "en" ? "3 sets" : "3 series",
     descripcion: ""
-  }));
+  })).slice(0, 6);
 }
 
 async function generateWorkoutAI(idx, week) {
@@ -689,18 +727,29 @@ async function generateWorkoutAI(idx, week) {
     const box = document.getElementById("ai-workout-list-" + idx);
     if (box) {
       let workouts = [];
+
+      // 1) la IA mandó ya estructurado
       if (data.structured && Array.isArray(data.structured.ejercicios)) {
-        workouts = data.structured.ejercicios;
+        workouts = normalizeWorkoutArray(data.structured.ejercicios, lang);
       } else {
-        try {
-          const parsed = JSON.parse(data.text);
-          if (parsed && Array.isArray(parsed.ejercicios)) {
-            workouts = parsed.ejercicios;
-          } else {
-            workouts = parseWorkoutTextToClean(data.text, lang);
+        const rawText = data.text || "";
+
+        // 2) intentar sacar el bloque JSON de un texto largo
+        const snippet = extractJSONSnippet(rawText);
+        if (snippet) {
+          try {
+            const parsed = JSON.parse(snippet);
+            if (parsed && Array.isArray(parsed.ejercicios)) {
+              workouts = normalizeWorkoutArray(parsed.ejercicios, lang);
+            }
+          } catch(e) {
+            // si falla seguimos al fallback
           }
-        } catch(e) {
-          workouts = parseWorkoutTextToClean(data.text, lang);
+        }
+
+        // 3) último recurso: convertir líneas en ejercicios
+        if (!workouts.length) {
+          workouts = parseWorkoutTextToClean(rawText, lang);
         }
       }
 
@@ -709,9 +758,9 @@ async function generateWorkoutAI(idx, week) {
         `<div class="ai-workout-grid">` +
         workouts
           .map(w => {
-            const n = w.nombre || w.name || "";
-            const s = w.series || w.reps || "";
-            const d = w.descripcion || w.desc || "";
+            const n = w.nombre || "";
+            const s = w.series || "";
+            const d = w.descripcion || "";
             return `
               <div class="ai-workout-item">
                 <div class="ai-w-name">${n}</div>
