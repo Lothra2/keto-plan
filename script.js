@@ -680,12 +680,14 @@ async function generateMealAI(idx, mealKey, week) {
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
 
-  // 1. Tomamos el día base para sacar las kcal de esa comida
+  // Día base → mantener cantidades y kcal originales
   const baseDay = derivedPlan[idx];
+  const baseMeal = baseDay[mealKey] || {};
+  const baseQty = baseMeal.qty || "";
   const mealPercent = mealPercents[mealKey] || 0;
   const mealKcal = mealPercent ? Math.round((baseDay.kcal || 1600) * mealPercent) : null;
 
-  // 2. Definimos nombres bonitos
+  // Nombre de la comida
   let mealNameES = "almuerzo";
   let mealNameEN = "lunch";
   if (mealKey === "desayuno") {
@@ -696,11 +698,11 @@ async function generateMealAI(idx, mealKey, week) {
     mealNameEN = "dinner";
   }
 
-  // 3. Prompt más limpio (solo nombre de plato)
+  // Prompt IA: nombre corto del plato
   const prompt =
     lang === "en"
       ? `Create ONE short keto ${mealNameEN} (~350-600 kcal). Prefer: ${like}. Avoid: ${dislike}. Reply ONLY with the dish name, no explanation, no list.`
-      : `Genera UN solo ${mealNameES} keto corto (~350-600 kcal). Prefiere: ${like}. Evita: ${dislike}. Responde SOLO con el nombre del plato, sin explicación, sin lista.`;
+      : `Genera UN solo ${mealNameES} keto corto (~350-600 kcal). Prefiere: ${like}. Evita: ${dislike}. Responde SOLO con el nombre del plato, sin explicación ni lista.`;
 
   try {
     const res = await fetch(GROK_PROXY, {
@@ -710,7 +712,7 @@ async function generateMealAI(idx, mealKey, week) {
         prompt,
         user: apiUser,
         pass: apiPass,
-        mode: mealKey, // tu backend espera "desayuno" | "almuerzo" | "cena"
+        mode: mealKey,
         lang
       })
     });
@@ -721,9 +723,7 @@ async function generateMealAI(idx, mealKey, week) {
       return;
     }
 
-    // 4. Limpiar respuesta IA
     let text = (data.text || "").replace(/\*\*/g, "").trim();
-    // si viniera con saltos o frases largas, nos quedamos con la primera
     if (text.includes("\n")) text = text.split("\n")[0].trim();
     if (text.includes(".")) {
       const first = text.split(".")[0].trim();
@@ -735,21 +735,18 @@ async function generateMealAI(idx, mealKey, week) {
       return;
     }
 
-    // 5. Nota de ingredientes (lácteos, etc.)
+    // Nota (lácteos, etc.)
     const note = analyzeAIMeal(text);
 
-    // 6. Guardamos en el storage con el FORMATO que quieres:
-    //    - línea de cantidades ahora dice que es IA y mantiene kcal
-    //    - cuerpo = plato IA
+    // Guardar estructura final
     const existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
     existing[mealKey] = {
-      // cuerpo / descripción
-      nombre: text,
-      // línea de arriba (la que antes decía "2 huevos...")
+      nombre: text, // nombre del plato IA
+      // cantidades base + marca IA y kcal
       qty:
-        lang === "en"
-          ? `IA ${mealNameEN}${mealKcal ? ` • ~${mealKcal} kcal` : ""}`
-          : `IA ${mealNameES}${mealKcal ? ` • ~${mealKcal} kcal` : ""}`,
+        (baseQty
+          ? `${baseQty} • IA ${mealNameES}`
+          : `IA ${mealNameES}`) + (mealKcal ? ` • ~${mealKcal} kcal` : ""),
       ...(note ? { note } : {})
     };
 
@@ -762,9 +759,6 @@ async function generateMealAI(idx, mealKey, week) {
   }
 }
 window.generateMealAI = generateMealAI;
-
-
-
 
 // ====== IA: DÍA COMPLETO ======
 async function generateFullDayAI(idx, week) {
