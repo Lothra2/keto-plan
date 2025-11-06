@@ -680,7 +680,7 @@ async function generateMealAI(idx, mealKey, week) {
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
 
-  // día base (el original) para mantener estructura
+  // día base para mantener estructura
   const baseDay = derivedPlan[idx];
   const baseMeal = baseDay[mealKey] || {};
   const baseQty = baseMeal.qty || "";
@@ -690,11 +690,11 @@ async function generateMealAI(idx, mealKey, week) {
     ? (baseQty ? `${baseQty} • ~${mealKcal} kcal` : `~${mealKcal} kcal`)
     : baseQty;
 
-  // lo que ya tengamos guardado
+  // lo que ya hay guardado
   let existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
   let hasMeal = !!existing[mealKey];
 
-  // --- 1) intentar tip local pero solo si no choca con dislikes ---
+  // --- 1) tip local (solo si no hay nada y no choca) ---
   const tip = localSmartTips[mealKey];
   const tipLower = tip ? tip.toLowerCase() : "";
   const userDislikeLower = dislike.toLowerCase();
@@ -704,9 +704,9 @@ async function generateMealAI(idx, mealKey, week) {
       : false;
 
   if (tip && !hasMeal && !tipConflicts) {
-    // 👇 mantenemos la comida base y solo agregamos nota
+    // mantener estructura base, solo agregamos nota
     existing[mealKey] = {
-      nombre: baseMeal.nombre || (lang === "en" ? "Base meal" : "Comida base"),
+      nombre: (baseMeal.nombre || mealKey.toUpperCase()) + " (IA)",
       qty: qtyWithKcal,
       note: tip
     };
@@ -729,8 +729,8 @@ async function generateMealAI(idx, mealKey, week) {
 
   const prompt =
     lang === "en"
-      ? `Create 1 short keto ${mealNameEN} (~350-600 kcal). Prefer: ${like}. Avoid: ${dislike}. Make it DIFFERENT from a chicken salad with spinach and feta. Respond ONLY with one line.`
-      : `Genera 1 ${mealNameES} keto corto (~350-600 kcal). Prefiere: ${like}. Evita: ${dislike}. Que sea DIFERENTE a una ensalada de pollo con espinaca y feta. Responde SOLO con una línea.`;
+      ? `Create 1 short keto ${mealNameEN} (~350-600 kcal). Prefer: ${like}. Avoid: ${dislike}. Respond ONLY with a short dish name, no explanation.`
+      : `Genera 1 ${mealNameES} keto corto (~350-600 kcal). Prefiere: ${like}. Evita: ${dislike}. Responde SOLO con el nombre del plato, sin explicación.`;
 
   try {
     const res = await fetch(GROK_PROXY, {
@@ -740,7 +740,7 @@ async function generateMealAI(idx, mealKey, week) {
         prompt,
         user: apiUser,
         pass: apiPass,
-        mode: mealKey, // el backend tuyo espera esto
+        mode: mealKey,
         lang
       })
     });
@@ -751,22 +751,35 @@ async function generateMealAI(idx, mealKey, week) {
       return;
     }
 
+    // limpiamos el texto de la IA
     let text = (data.text || "").replace(/\*\*/g, "").trim();
+    // quedarnos solo con la primera línea / primera oración
+    if (text.includes("\n")) text = text.split("\n")[0].trim();
+    if (text.includes(".")) {
+      const first = text.split(".")[0].trim();
+      // si la primera frase tiene sentido, la usamos
+      if (first.length > 10) text = first;
+    }
+
     if (!text) {
       showToast(lang === "en" ? "AI returned empty text" : "La IA devolvió texto vacío");
       return;
     }
 
+    // revisar lácteos u otros ingredientes
     const note = analyzeAIMeal(text);
 
-    // 👇 aquí mantenemos las cantidades del plan original + kcal estimadas
+    // 👇 aquí viene lo importante:
+    // - nombre: lo que diga la IA + "(IA)"
+    // - qty: la del plan base con kcal
+    // - note: solo si hace falta
     existing[mealKey] = {
-      nombre: text,
+      nombre: `${text} · IA ${mealNameES}`,
       qty: qtyWithKcal,
       ...(note ? { note } : {})
     };
-    localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
 
+    localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
     renderMenuDay(idx, week);
     showToast(lang === "en" ? "AI meal updated" : "Comida IA actualizada");
   } catch (e) {
@@ -775,6 +788,7 @@ async function generateMealAI(idx, mealKey, week) {
   }
 }
 window.generateMealAI = generateMealAI;
+
 
 
 // ====== IA: DÍA COMPLETO ======
