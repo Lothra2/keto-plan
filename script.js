@@ -1659,15 +1659,12 @@ function editarProgreso(idx) {
   const form = document.getElementById("prog-form-" + idx);
   const resumen = document.getElementById("prog-resumen-" + idx);
   const collapsed = document.getElementById("prog-collapsed-" + idx);
-  if (collapsed) {
-    collapsed.style.display = "block";
-    collapsed.innerHTML = `<p class="small">${appLang === "en" ? "Saved:" : "Guardado:"} ${data.peso ? (appLang === "en" ? `Weight ${data.peso} kg` : `Peso ${data.peso} kg`) : ""}</p>`;
-  }
   if (form) form.style.display = "block";
   if (resumen) resumen.style.display = "none";
   if (collapsed) collapsed.style.display = "none";
 }
 window.editarProgreso = editarProgreso;
+
 
 // ====== TABS ======
 function switchTab(target) {
