@@ -1203,3 +1203,51 @@ input[type="date"] {
   font-style: italic;
   margin-top: 3px;
 }
+
+/* === Progreso colapsado === */
+.prog-card .day-title {
+  display: flex;
+  justify-content: space-between;
+  gap: .5rem;
+  align-items: center;
+}
+
+.small-prog-btn {
+  width: auto;
+  padding: .25rem .55rem .3rem;
+  font-size: .65rem;
+  border-radius: .5rem;
+  background: transparent;
+  border: 1px solid rgba(148,163,184,.25);
+  color: inherit;
+  cursor: pointer;
+}
+
+.prog-collapsed {
+  margin-top: .4rem;
+  background: rgba(15,23,42,.12);
+  border: 1px solid rgba(148,163,184,.05);
+  border-radius: .6rem;
+  padding: .35rem .5rem .25rem;
+}
+
+.prog-collapsed .small {
+  margin: 0;
+  font-size: .7rem;
+  opacity: .9;
+}
+
+/* modo claro */
+[data-theme="light"] .prog-collapsed {
+  background: rgba(255,255,255,.6);
+  border-color: rgba(148,163,184,.18);
+}
+
+[data-theme="light"] .small-prog-btn {
+  border-color: rgba(148,163,184,.4);
+}
+
+/* 👇 este es el último */
+.prog-form {
+  margin-top: .4rem;
+}
