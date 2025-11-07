@@ -22,6 +22,8 @@ const LS_CAL_PREFIX = LS_PREFIX + "cal-";
 const LS_PROGRESS_PREFIX = LS_PREFIX + "prog-";
 const LS_SELECTED_DAY = LS_PREFIX + "sel-day"; // recordar día seleccionado
 const LS_SELECTED_WEEK = LS_PREFIX + "sel-week"; // recordar semana seleccionada
+const LS_WORKOUT_INTENSITY = LS_PREFIX + "workout-intensity"; // ligera/moderada/alta
+
 
 // agua
 const LS_WATER_PREFIX = LS_PREFIX + "water-";
@@ -1018,25 +1020,39 @@ async function generateWorkoutAI(idx, week) {
   const dayNumber = idx + 1;
   const weekNumber = Math.floor(idx / 7) + 1;
 
-  // 👇 nuevo: ver últimos 2 días para no repetir
+  // 👉 leer intensidad guardada
+  const intensity = localStorage.getItem(LS_WORKOUT_INTENSITY) || "medium";
+
+  // 👉 descripción según intensidad
+  const intensityMap = {
+    soft: lang === "en"
+      ? "light 20–25 min, mobility, stretching, low impact"
+      : "suave 20–25 min, movilidad, estiramientos, bajo impacto",
+    medium: lang === "en"
+      ? "moderate 30–35 min, balanced bodyweight strength"
+      : "moderado 30–35 min, fuerza con peso corporal balanceada",
+    hard: lang === "en"
+      ? "hard 45–50 min, high-quality, intense full-body routine"
+      : "intenso 45–50 min, rutina completa exigente y de calidad"
+  };
+
+  // 👉 ver los entrenos previos para no repetir
   const prev1 = idx > 0 ? localStorage.getItem(LS_AI_WORKOUT + (idx - 1)) : null;
   const prev2 = idx > 1 ? localStorage.getItem(LS_AI_WORKOUT + (idx - 2)) : null;
   const avoidList = [];
-  if (prev1) {
-    try {
-      JSON.parse(prev1).forEach(e => avoidList.push(e.nombre));
-    } catch(e) {}
-  }
-  if (prev2) {
-    try {
-      JSON.parse(prev2).forEach(e => avoidList.push(e.nombre));
-    } catch(e) {}
-  }
+
+  [prev1, prev2].forEach(p => {
+    if (p) {
+      try {
+        JSON.parse(p).forEach(e => e.nombre && avoidList.push(e.nombre));
+      } catch (e) {}
+    }
+  });
 
   const prompt =
     lang === "en"
-      ? `Return a JSON with field "ejercicios" for day ${dayNumber} (week ${weekNumber}) of a keto-fatloss plan. Make it different from the previous 2 days. Use only bodyweight. User data: height ${height} cm, weight ${weight} kg, age ${age}. Avoid repeating these if possible: ${avoidList.join(", ")}. Each item: {"nombre": short name, "series": like "3 x 12" or time, "descripcion": very short tip}. English.`
-      : `Devuelve un JSON con un campo "ejercicios" para el día ${dayNumber} (semana ${weekNumber}) de un plan para bajar grasa. Que NO sea igual a los últimos 2 días. Solo peso corporal. Datos usuario: estatura ${height} cm, peso ${weight} kg, edad ${age}. Evita repetir si puedes estos ejercicios: ${avoidList.join(", ")}. Cada ítem: {"nombre": nombre corto, "series": "3 x 12" o tiempo, "descripcion": tip muy corto}. Español.`;
+      ? `Return a JSON with field "ejercicios" for day ${dayNumber} (week ${weekNumber}) of a ${intensityMap[intensity]}. User data: height ${height} cm, weight ${weight} kg, age ${age}. Avoid repeating these exercises: ${avoidList.join(", ")}. Each item: {"nombre": short name, "series": "3 x 12" or time, "descripcion": very short tip}. English.`
+      : `Devuelve un JSON con campo "ejercicios" para el día ${dayNumber} (semana ${weekNumber}) de un entreno ${intensityMap[intensity]}. Datos usuario: estatura ${height} cm, peso ${weight} kg, edad ${age}. Evita repetir estos ejercicios: ${avoidList.join(", ")}. Cada ítem: {"nombre": nombre corto, "series": "3 x 12" o tiempo, "descripcion": tip muy corto}. Español.`;
 
   try {
     const res = await fetch(GROK_PROXY, {
@@ -1063,7 +1079,7 @@ async function generateWorkoutAI(idx, week) {
           if (parsed && Array.isArray(parsed.ejercicios)) {
             workouts = normalizeWorkoutArray(parsed.ejercicios, lang);
           }
-        } catch(e) {}
+        } catch (e) {}
       }
       if (!workouts.length) {
         workouts = parseWorkoutTextToClean(rawText, lang);
@@ -1712,6 +1728,10 @@ function switchTab(target) {
     const g = localStorage.getItem(LS_GENDER) || "male";
     const gSel = document.getElementById("genderSelect");
     if (gSel) gSel.value = g;
+    // 👇 intensidad del plan
+    const wInt = localStorage.getItem(LS_WORKOUT_INTENSITY) || "medium";
+    const wSel = document.getElementById("workoutIntensity");
+    if (wSel) wSel.value = wInt;
   }
 
 }
@@ -1795,6 +1815,14 @@ function changeGender() {
   showToast(appLang === "en" ? "Gender updated" : "Género actualizado");
 }
 window.changeGender = changeGender;
+
+// intensidad del plan
+function changeWorkoutIntensity() {
+  const val = document.getElementById("workoutIntensity").value;
+  localStorage.setItem(LS_WORKOUT_INTENSITY, val);
+  showToast(appLang === "en" ? "Workout intensity updated" : "Intensidad de entreno actualizada");
+}
+window.changeWorkoutIntensity = changeWorkoutIntensity;
 
 function changePlanWeeks() {
   const val = Number(document.getElementById("planWeeks").value);
