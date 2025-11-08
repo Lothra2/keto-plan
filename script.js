@@ -1027,11 +1027,12 @@ function renderWorkoutCardsFromArray(idx, workouts, lang) {
         const n = w.nombre || "";
         const s = w.series || "";
         const d = w.descripcion || "";
+        // aquí los unimos en una sola línea
+        const line = d ? `${s} · ${d}` : s;
         return `
           <div class="ai-workout-item">
             <div class="ai-w-name">${n}</div>
-            <div class="ai-w-series">${s}</div>
-            <div class="ai-w-desc">${d}</div>
+            <div class="ai-w-series">${line}</div>
           </div>
         `;
       })
@@ -1039,6 +1040,7 @@ function renderWorkoutCardsFromArray(idx, workouts, lang) {
     `</div>`;
   box.style.display = "block";
 }
+
 
 async function generateWorkoutAI(idx, week) {
   const apiUser = localStorage.getItem(LS_API_USER) || "";

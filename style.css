@@ -800,14 +800,17 @@ input:checked + .ball::after {
   flex-direction: column;
   gap: .15rem;
 }
+
 .ai-w-name {
   font-weight: 600;
   font-size: .6rem;
 }
+
 .ai-w-series {
-  font-size: .55rem;
-  opacity: .7;
+  font-size: .78rem;
+  color: rgba(226,232,240,.7);
 }
+
 .ai-w-desc {
   font-size: .53rem;
   opacity: .6;
