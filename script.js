@@ -1198,14 +1198,24 @@ window.recalibrateWorkoutAI = recalibrateWorkoutAI;
 
 // ====== GENERAR SEMANA COMPLETA CON IA ======
 async function generateWeekWithAI(week) {
-  const start = (week - 1) * 7;
-  const end = Math.min(week * 7, derivedPlan.length);
+  // si no viene la semana desde el botón, uso la que el usuario tiene seleccionada
+  const selWeek = typeof week === "number"
+    ? week
+    : Number(localStorage.getItem(LS_SELECTED_WEEK)) || 1;
+
+  const start = (selWeek - 1) * 7;
+  const end = Math.min(selWeek * 7, derivedPlan.length);
+
   for (let i = start; i < end; i++) {
-    await generateFullDayAI(i, week);
+    // generamos el día completo con IA
+    // importante pasar la semana correcta
+    await generateFullDayAI(i, selWeek);
   }
+
   showToast(appLang === "en" ? "Week generated with AI" : "Semana generada con IA");
 }
 window.generateWeekWithAI = generateWeekWithAI;
+
 
 // ====== GENERAR ENTRENOS IA DE LA SEMANA ======
 async function generateWorkoutWeekAI() {
