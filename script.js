@@ -1026,14 +1026,14 @@ async function generateWorkoutAI(idx, week) {
   // 👉 descripción según intensidad
   const intensityMap = {
     soft: lang === "en"
-      ? "light 20–25 min, mobility, stretching, low impact"
-      : "suave 20–25 min, movilidad, estiramientos, bajo impacto",
+      ? "light 20–25 min, mobility, stretching, low impact, bodyweight only, no equipment"
+      : "suave 20–25 min, movilidad, estiramientos, bajo impacto, solo peso corporal, sin equipos",
     medium: lang === "en"
-      ? "moderate 30–35 min, balanced bodyweight strength"
-      : "moderado 30–35 min, fuerza con peso corporal balanceada",
+      ? "moderate 30–35 min, functional spartan style, bodyweight only, no equipment"
+      : "moderado 30–35 min, estilo funcional tipo Sparta, solo peso corporal, sin equipos",
     hard: lang === "en"
-      ? "hard 45–50 min, high-quality, intense full-body routine"
-      : "intenso 45–50 min, rutina completa exigente y de calidad"
+      ? "hard 45–50 min, spartan style, high intensity, bodyweight only, no equipment"
+      : "intenso 45–50 min, estilo Sparta, alta intensidad, solo peso corporal, sin equipos"
   };
 
   // 👉 ver los entrenos previos para no repetir
@@ -1051,8 +1051,8 @@ async function generateWorkoutAI(idx, week) {
 
   const prompt =
     lang === "en"
-      ? `Return a JSON with field "ejercicios" for day ${dayNumber} (week ${weekNumber}) of a ${intensityMap[intensity]}. User data: height ${height} cm, weight ${weight} kg, age ${age}. Avoid repeating these exercises: ${avoidList.join(", ")}. Each item: {"nombre": short name, "series": "3 x 12" or time, "descripcion": very short tip}. English.`
-      : `Devuelve un JSON con campo "ejercicios" para el día ${dayNumber} (semana ${weekNumber}) de un entreno ${intensityMap[intensity]}. Datos usuario: estatura ${height} cm, peso ${weight} kg, edad ${age}. Evita repetir estos ejercicios: ${avoidList.join(", ")}. Cada ítem: {"nombre": nombre corto, "series": "3 x 12" o tiempo, "descripcion": tip muy corto}. Español.`;
+      ? `Return a JSON with field "ejercicios" for day ${dayNumber} (week ${weekNumber}) of a ${intensityMap[intensity]}. This must be a bodyweight-only workout, no equipment, no dumbbells, no bands, no machines, no pull-up bar. Use functional or spartan style moves (squats, lunges, pushups, burpees, mountain climbers, core). User data: height ${height} cm, weight ${weight} kg, age ${age}. Avoid repeating these exercises: ${avoidList.join(", ")}. Each item: {"nombre": short name, "series": "3 x 12" or time, "descripcion": very short tip}. English.`
+      : `Devuelve un JSON con campo "ejercicios" para el día ${dayNumber} (semana ${weekNumber}) de un entreno ${intensityMap[intensity]}. Debe ser SOLO con peso corporal, sin equipos, sin mancuernas, sin bandas, sin máquinas, sin barra de dominadas. Usa movimientos funcionales o estilo Sparta (sentadillas, zancadas, flexiones, burpees, escaladores, core). Datos usuario: estatura ${height} cm, peso ${weight} kg, edad ${age}. Evita repetir estos ejercicios: ${avoidList.join(", ")}. Cada ítem: {"nombre": nombre corto, "series": "3 x 12" o tiempo, "descripcion": tip muy corto}. Español.`;
 
   try {
     const res = await fetch(GROK_PROXY, {
