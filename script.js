@@ -2416,15 +2416,31 @@ function initApp() {
 document.addEventListener("DOMContentLoaded", initApp);
 
 // ====== TOGGLE VISIBILIDAD DEL RESUMEN IA DE SEMANA ======
-document.getElementById("aiWeeklyReviewBtn").addEventListener("click", () => {
-  const summary = document.getElementById("aiWeekSummary");
+const aiReviewBtn = document.getElementById("aiWeeklyReviewBtn");
+const aiSummary = document.getElementById("aiWeekSummary");
+let aiWeekGenerated = false; // Para saber si ya se generó
 
-  // Si ya se muestra, lo ocultamos
-  if (summary.style.display === "block") {
-    summary.style.display = "none";
-  } else {
-    // Si está oculto, mostramos y llamamos la función que lo llena
-    summary.style.display = "block";
-    if (typeof analyzeWeekWithAI === "function") analyzeWeekWithAI();
+aiReviewBtn.addEventListener("click", async () => {
+  // Si ya está visible, solo la ocultamos
+  if (aiSummary.style.display === "block") {
+    aiSummary.style.display = "none";
+    aiReviewBtn.textContent = "Revisar semana con IA 📊";
+    return;
+  }
+
+  // Si no está visible y ya se generó antes, solo la mostramos
+  if (aiWeekGenerated) {
+    aiSummary.style.display = "block";
+    aiReviewBtn.textContent = "Ocultar revisión IA 🙈";
+    return;
+  }
+
+  // Si nunca se ha generado, llamamos a la función y luego marcamos como generada
+  if (typeof analyzeWeekWithAI === "function") {
+    aiReviewBtn.textContent = "Analizando semana... ⏳";
+    await analyzeWeekWithAI();
+    aiWeekGenerated = true;
+    aiReviewBtn.textContent = "Ocultar revisión IA 🙈";
+    aiSummary.style.display = "block";
   }
 });
