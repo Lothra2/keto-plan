@@ -2414,3 +2414,17 @@ function initApp() {
   document.getElementById("splash-screen").classList.add("hide");
 }
 document.addEventListener("DOMContentLoaded", initApp);
+
+// ====== TOGGLE VISIBILIDAD DEL RESUMEN IA DE SEMANA ======
+document.getElementById("aiWeeklyReviewBtn").addEventListener("click", () => {
+  const summary = document.getElementById("aiWeekSummary");
+
+  // Si ya se muestra, lo ocultamos
+  if (summary.style.display === "block") {
+    summary.style.display = "none";
+  } else {
+    // Si está oculto, mostramos y llamamos la función que lo llena
+    summary.style.display = "block";
+    if (typeof analyzeWeekWithAI === "function") analyzeWeekWithAI();
+  }
+});
