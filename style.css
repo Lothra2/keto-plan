@@ -807,7 +807,7 @@ input:checked + .ball::after {
 }
 
 .ai-w-series {
-  font-size: .78rem;
+  font-size: .56rem;
   color: rgba(226,232,240,.7);
 }
 
