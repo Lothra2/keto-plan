@@ -803,18 +803,18 @@ input:checked + .ball::after {
 
 .ai-w-name {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.62rem;
   color: var(--text);
 }
 
 .ai-w-series {
-  font-size: 0.78rem;
+  font-size: 0.58rem;
   color: rgba(226,232,240,.7);
   margin-top: 0.1rem;
 }
 
 .ai-w-desc {
-  font-size: 0.76rem;
+  font-size: 0.566rem;
   color: rgba(226,232,240,.55);
   margin-top: 0.15rem;
 }
