@@ -1215,7 +1215,9 @@ async function generateWeekWithAI(week) {
   showToast(appLang === "en" ? "Week generated with AI" : "Semana generada con IA");
 }
 window.generateWeekWithAI = generateWeekWithAI;
-
+// 👇 estos dos son los que te faltaban
+window.generateWeekAI = generateWeekWithAI;
+window.generateWeekIa = generateWeekWithAI;
 
 // ====== GENERAR ENTRENOS IA DE LA SEMANA ======
 async function generateWorkoutWeekAI() {
