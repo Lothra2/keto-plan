@@ -1024,15 +1024,16 @@ function renderWorkoutCardsFromArray(idx, workouts, lang) {
     `<div class="ai-workout-grid">` +
     workouts
       .map(w => {
-        const n = w.nombre || "";
-        const s = w.series || "";
-        const d = w.descripcion || "";
-        // aquí los unimos en una sola línea
-        const line = d ? `${s} · ${d}` : s;
+        const series = w.series || "";
+        const rest = w.rest || "";
+        const desc = w.descripcion || "";
+        const seriesLine = rest ? `${series} · ${rest}` : series;
+
         return `
           <div class="ai-workout-item">
-            <div class="ai-w-name">${n}</div>
-            <div class="ai-w-series">${line}</div>
+            <div class="ai-w-name">${w.nombre}</div>
+            <div class="ai-w-series">${seriesLine}</div>
+            ${desc ? `<div class="ai-w-desc">${desc}</div>` : ""}
           </div>
         `;
       })
