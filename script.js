@@ -23,6 +23,7 @@ const LS_PROGRESS_PREFIX = LS_PREFIX + "prog-";
 const LS_SELECTED_DAY = LS_PREFIX + "sel-day"; // recordar día seleccionado
 const LS_SELECTED_WEEK = LS_PREFIX + "sel-week"; // recordar semana seleccionada
 const LS_WORKOUT_INTENSITY = LS_PREFIX + "workout-intensity"; // ligera/moderada/alta
+const LS_AI_SHOPPING = LS_PREFIX + "ai-shopping-"; // lista de compras IA por semana
 
 
 // agua
@@ -597,6 +598,9 @@ function renderMenuDay(idx, week) {
       <p class="small" id="workout-text-${idx}">${workout.today}</p>
       <button class="ia-btn small-btn" onclick="generateWorkoutAI(${idx}, ${week})">${appLang === "en" ? "Workout AI 🏋️" : "Entreno IA 🏋️"}</button>
       <div class="ai-workout-list" id="ai-workout-list-${idx}" style="display:none"></div>
+      <button class="ia-btn ghost-btn small-btn" onclick="recalibrateWorkoutAI(${idx}, ${week})">
+        ${appLang === "en" ? "Recalibrate 🛠" : "Recalibrar 🛠"}
+      </button>
     </div>
     <div class="ai-review-box" id="ai-review-${idx}" style="display:none"></div>
     <div class="day-actions">
@@ -1097,6 +1101,83 @@ async function generateWorkoutAI(idx, week) {
 }
 window.generateWorkoutAI = generateWorkoutAI;
 
+// ====== IA: RECALIBRAR ENTRENAMIENTO ======
+async function recalibrateWorkoutAI(idx, week) {
+  const lang = appLang;
+  const apiUser = localStorage.getItem(LS_API_USER) || "";
+  const apiPass = localStorage.getItem(LS_API_PASS) || "";
+
+  // entreno IA actual
+  const currentWorkoutRaw = localStorage.getItem(LS_AI_WORKOUT + idx);
+  const currentWorkout = currentWorkoutRaw ? JSON.parse(currentWorkoutRaw) : [];
+
+  // progreso del día (si hizo ejercicio o no)
+  const prog = JSON.parse(localStorage.getItem(LS_PROGRESS_PREFIX + idx) || "{}");
+  const didExerciseKcal = prog.exkcal ? Number(prog.exkcal) : 0;
+  const dayDone = localStorage.getItem(LS_PREFIX + "done-" + idx) === "1";
+
+  // hoy es qué día y semana
+  const dayNumber = idx + 1;
+  const weekNumber = Math.floor(idx / 7) + 1;
+
+  // decidimos si subir o bajar
+  let intent = "keep";
+  if (!dayDone || didExerciseKcal === 0) intent = "lighter";
+  if (didExerciseKcal > 250) intent = "harder";
+
+  const prompt = lang === "en"
+    ? `You will receive a bodyweight workout (no equipment). The user ${dayDone ? "completed the day" : "did not complete the day"} and logged ${didExerciseKcal} kcal of exercise. Recalibrate it to be ${intent === "lighter" ? "lighter and shorter (15-20 min)" : intent === "harder" ? "harder (30-40 min)" : "similar"} for day ${dayNumber}, week ${weekNumber}. Return JSON with "ejercicios": [{"nombre":..,"series":..,"descripcion":..}] and keep it functional/spartan style. Here is the current workout: ${JSON.stringify(currentWorkout)}`
+    : `Vas a recibir un entreno con peso corporal (sin equipos). El usuario ${dayDone ? "sí completó el día" : "no completó el día"} y registró ${didExerciseKcal} kcal de ejercicio. Recalíbralo para que sea ${intent === "lighter" ? "más suave y corto (15-20 min)" : intent === "harder" ? "más intenso (30-40 min)" : "similar"} para el día ${dayNumber}, semana ${weekNumber}. Devuelve JSON con "ejercicios": [{"nombre":..,"series":..,"descripcion":..}] y estilo funcional/Sparta. Este es el entreno actual: ${JSON.stringify(currentWorkout)}`;
+
+  try {
+    const res = await fetch(GROK_PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: "workout-recalib",
+        user: apiUser,
+        pass: apiPass,
+        lang,
+        prompt
+      })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      showToast(data.error || (lang === "en" ? "AI did not respond" : "IA no respondió"));
+      return;
+    }
+
+    let workouts = [];
+
+    if (data.structured && Array.isArray(data.structured.ejercicios)) {
+      workouts = normalizeWorkoutArray(data.structured.ejercicios, lang);
+    } else {
+      const rawText = data.text || "";
+      const snippet = extractJSONSnippet(rawText);
+      if (snippet) {
+        try {
+          const parsed = JSON.parse(snippet);
+          if (parsed && Array.isArray(parsed.ejercicios)) {
+            workouts = normalizeWorkoutArray(parsed.ejercicios, lang);
+          }
+        } catch (e) {}
+      }
+      if (!workouts.length) {
+        workouts = parseWorkoutTextToClean(rawText, lang);
+      }
+    }
+
+    localStorage.setItem(LS_AI_WORKOUT + idx, JSON.stringify(workouts));
+    renderWorkoutCardsFromArray(idx, workouts, lang);
+    showToast(lang === "en" ? "Workout recalibrated" : "Entreno recalibrado");
+  } catch (err) {
+    console.error(err);
+    showToast(appLang === "en" ? "Error calling AI" : "Error llamando a la IA");
+  }
+}
+window.recalibrateWorkoutAI = recalibrateWorkoutAI;
+
+
 // ====== GENERAR SEMANA COMPLETA CON IA ======
 async function generateWeekWithAI(week) {
   const start = (week - 1) * 7;
@@ -1107,6 +1188,21 @@ async function generateWeekWithAI(week) {
   showToast(appLang === "en" ? "Week generated with AI" : "Semana generada con IA");
 }
 window.generateWeekWithAI = generateWeekWithAI;
+
+// ====== GENERAR ENTRENOS IA DE LA SEMANA ======
+async function generateWorkoutWeekAI() {
+  const selWeek = Number(localStorage.getItem(LS_SELECTED_WEEK)) || 1;
+  const start = (selWeek - 1) * 7;
+  const end = Math.min(selWeek * 7, derivedPlan.length);
+  for (let i = start; i < end; i++) {
+    // generamos entreno IA para cada día
+    // eslint-disable-next-line no-await-in-loop
+    await generateWorkoutAI(i, selWeek);
+  }
+  showToast(appLang === "en" ? "AI workouts for the week generated" : "Entrenos IA de la semana listos");
+}
+window.generateWorkoutWeekAI = generateWorkoutWeekAI;
+
 
 // ====== RENDERIZAR REVISIÓN SEMANAL GUARDADA ======
 function renderStoredWeekReview(week) {
@@ -1210,17 +1306,25 @@ async function motivateDayWithAI() {
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
   const selDay = Number(localStorage.getItem(LS_SELECTED_DAY)) || 0;
   const d = getDayWithAI(selDay);
+  const name = localStorage.getItem(LS_NAME) || "";
+  const water = getWaterState(selDay);
+  const dayDone = localStorage.getItem(LS_PREFIX + "done-" + selDay) === "1";
+
+  // mira si hubo revisión semanal
+  const selWeek = Number(localStorage.getItem(LS_SELECTED_WEEK)) || (Math.floor(selDay / 7) + 1);
+  const weekReview = localStorage.getItem(LS_AI_WEEK_PREFIX + selWeek) || "";
+
   const prompt =
     lang === "en"
-      ? `Give me a short, energetic, second-person motivation message (max 35 words) for someone doing a keto plan. Mention today's meal very lightly and discipline.`
-      : `Dame un mensaje motivacional corto, en segunda persona, máximo 35 palabras, para alguien que está siguiendo un plan keto. Menciona muy ligero que ya tiene su menú y que siga disciplinado.`;
+      ? `You are a short, energetic coach. User name: "${name}". Today is ${d.dia}. Today's main meal: "${d.almuerzo?.nombre || d.cena?.nombre || "keto meal"}". Water today: ${water.ml}/${water.goal} ml. Day completed: ${dayDone}. Last week review (optional): ${weekReview}. Write 1 message in second person, max 40 words, that praises what is done (water or day) and pushes to stay on the keto plan. Mention name ONLY if not empty.`
+      : `Eres un coach corto y energético. Nombre: "${name}". Hoy es ${d.dia}. Comida principal de hoy: "${d.almuerzo?.nombre || d.cena?.nombre || "comida keto"}". Agua hoy: ${water.ml}/${water.goal} ml. Día completado: ${dayDone}. Revisión semana pasada (opcional): ${weekReview}. Escribe 1 mensaje en segunda persona, máximo 40 palabras, que celebre lo hecho (agua o día) y empuje a seguir el plan keto. Menciona el nombre SOLO si no está vacío.`;
 
   try {
     const res = await fetch(GROK_PROXY, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        mode: "motivation",
+        mode: "motivation-coach",
         user: apiUser,
         pass: apiPass,
         lang,
@@ -1249,28 +1353,62 @@ window.motivateDayWithAI = motivateDayWithAI;
 function renderCompras() {
   const container = document.getElementById("compras");
   container.innerHTML = "";
+
+  // semana seleccionada (para ligar lista IA a la semana)
+  const selWeek = Number(localStorage.getItem(LS_SELECTED_WEEK)) || 1;
+
+  // ——— Resumen rápido ———
   const done = getCompletedCount();
   const dash = document.createElement("div");
   dash.className = "list-row";
   dash.innerHTML = `
     <strong>${appLang === "en" ? "Quick summary" : "Resumen rápido"}</strong>
-    <div class="small">${appLang === "en" ? "Completed days" : "Días completados"}: ${done} ${appLang === "en" ? "of" : "de"} ${derivedPlan.length}</div>
+    <div class="small">
+      ${appLang === "en"
+        ? `Completed days: ${done} of ${derivedPlan.length}`
+        : `Días completados: ${done} de ${derivedPlan.length}`}
+    </div>
+    <div class="small" style="margin-top:6px;">
+      ${appLang === "en"
+        ? `Week shown: ${selWeek}`
+        : `Semana mostrada: ${selWeek}`}
+    </div>
   `;
   container.appendChild(dash);
 
-  const list = appLang === "en" ? [
-    {cat:"Proteins",items:"Eggs, chicken, salmon, shrimp, beef, greek yogurt"},
-    {cat:"Veggies",items:"Broccoli, cauliflower, cherry tomato, rocket, avocado, mushrooms"},
-    {cat:"Healthy fats",items:"Butter, olive oil, heavy cream, feta cheese"},
-    {cat:"Snacks",items:"Cashews, nuts, chia, shredded coconut"},
-    {cat:"Others",items:"Sugar-free coffee, pink salt, lemon"}
-  ] : [
-    {cat:"Proteínas",items:"Huevos, pollo, salmón, camarones, carne de res, yogur griego"},
-    {cat:"Verduras",items:"Brócoli, coliflor, tomate cherry, rúcula/rocket, aguacate, champiñón"},
-    {cat:"Grasas buenas",items:"Mantequilla, aceite de oliva, crema de leche, queso feta"},
-    {cat:"Snacks",items:"Marañones, nueces, chía, coco rallado"},
-    {cat:"Otros",items:"Café sin azúcar, sal rosada, limón"}
-  ];
+  // ——— Botón IA (generar) ———
+  const aiRow = document.createElement("div");
+  aiRow.className = "list-row";
+  aiRow.innerHTML = `
+    <strong>${appLang === "en" ? "AI actions" : "Acciones IA"}</strong>
+    <p class="small" style="margin-bottom:6px;">
+      ${appLang === "en"
+        ? "Generate a shopping list using your AI meals and base plan."
+        : "Genera una lista de compras usando tus comidas IA y el plan base."}
+    </p>
+    <button class="save-btn" onclick="improveShoppingWithAI(${selWeek})">
+      ${appLang === "en" ? "Generate AI shopping 🛒" : "Generar lista IA 🛒"}
+    </button>
+  `;
+  container.appendChild(aiRow);
+
+  // ——— Lista base de compras (la tuya de siempre) ———
+  const list = appLang === "en"
+    ? [
+        { cat: "Proteins", items: "Eggs, chicken, salmon, shrimp, beef, greek yogurt" },
+        { cat: "Veggies", items: "Broccoli, cauliflower, cherry tomato, rocket, avocado, mushrooms" },
+        { cat: "Healthy fats", items: "Butter, olive oil, heavy cream, feta cheese" },
+        { cat: "Snacks", items: "Cashews, nuts, chia, shredded coconut" },
+        { cat: "Others", items: "Sugar-free coffee, pink salt, lemon" }
+      ]
+    : [
+        { cat: "Proteínas", items: "Huevos, pollo, salmón, camarones, carne de res, yogur griego" },
+        { cat: "Verduras", items: "Brócoli, coliflor, tomate cherry, rúcula/rocket, aguacate, champiñón" },
+        { cat: "Grasas buenas", items: "Mantequilla, aceite de oliva, crema de leche, queso feta" },
+        { cat: "Snacks", items: "Marañones, nueces, chía, coco rallado" },
+        { cat: "Otros", items: "Café sin azúcar, sal rosada, limón" }
+      ];
+
   list.forEach(it => {
     const row = document.createElement("div");
     row.className = "list-row";
@@ -1278,31 +1416,123 @@ function renderCompras() {
     container.appendChild(row);
   });
 
+  // ——— Mostrar lista IA guardada (si existe para esa semana) ———
+  const storedShop = localStorage.getItem(LS_AI_SHOPPING + selWeek);
+  if (storedShop) {
+    const row = document.createElement("div");
+    row.className = "list-row";
+    row.innerHTML = `
+      <strong>${appLang === "en" ? "Saved AI list" : "Lista IA guardada"}</strong>
+      <pre class="small" style="white-space:pre-wrap">${storedShop}</pre>
+    `;
+    container.appendChild(row);
+  }
+
+  // ——— Extras IA detectados por día (lo que ya estabas haciendo) ———
   const aiExtras = [];
   for (let idx = 0; idx < derivedPlan.length; idx++) {
     const aiDay = localStorage.getItem(LS_AI_DAY_PREFIX + idx);
     if (aiDay) {
       try {
         const parsed = JSON.parse(aiDay);
-        ["desayuno","snackAM","almuerzo","snackPM","cena"].forEach(m => {
+        ["desayuno", "snackAM", "almuerzo", "snackPM", "cena"].forEach(m => {
           if (parsed[m] && parsed[m].qty) {
             const ing = extractIngredientsFromQty(parsed[m].qty);
             ing.forEach(x => aiExtras.push(x));
           }
         });
-      } catch(e) {}
+      } catch (e) {}
     }
   }
   if (aiExtras.length) {
     const row = document.createElement("div");
     row.className = "list-row";
-    row.innerHTML = `<strong>${appLang === "en" ? "AI extras" : "Extras IA"}</strong>
-    <div class="small ai-extras-inline">${aiExtras.join(" • ")}</div>`;
+    row.innerHTML = `
+      <strong>${appLang === "en" ? "AI extras" : "Extras IA"}</strong>
+      <div class="small ai-extras-inline">${aiExtras.join(" • ")}</div>
+    `;
     container.appendChild(row);
   }
 
   animateCards();
 }
+
+// ====== IA: MEJORAR LISTA DE COMPRAS ======
+async function improveShoppingWithAI() {
+  const lang = appLang;
+  const apiUser = localStorage.getItem(LS_API_USER) || "";
+  const apiPass = localStorage.getItem(LS_API_PASS) || "";
+
+  // semana seleccionada (ya la guardas)
+  const selWeek = Number(localStorage.getItem(LS_SELECTED_WEEK)) || 1;
+  const startIdx = (selWeek - 1) * 7;
+  const endIdx = Math.min(selWeek * 7, derivedPlan.length);
+
+  // juntamos los 7 días (mergeando IA si hay)
+  const weekDays = [];
+  for (let i = startIdx; i < endIdx; i++) {
+    const d = getDayWithAI(i);
+    weekDays.push({
+      name: d.dia,
+      breakfast: d.desayuno ? d.desayuno.qty || d.desayuno.nombre || "" : "",
+      snackAM: d.snackAM ? d.snackAM.qty || d.snackAM.nombre || "" : "",
+      lunch: d.almuerzo ? d.almuerzo.qty || d.almuerzo.nombre || "" : "",
+      snackPM: d.snackPM ? d.snackPM.qty || d.snackPM.nombre || "" : "",
+      dinner: d.cena ? d.cena.qty || d.cena.nombre || "" : ""
+    });
+  }
+
+  const prompt = lang === "en"
+    ? `You will receive 7 keto days with ingredients and quantities. Condense all ingredients into 1 clean shopping list in English, grouped by sections (Protein, Veggies, Dairy/Fats, Pantry/Other). Merge similar items (e.g. "chicken", "chicken breast") and sum quantities approximately. Keep it short. Here is the week: ${JSON.stringify(weekDays)}`
+    : `Recibirás 7 días keto con ingredientes y cantidades. Condénsalos en 1 sola lista de compras en español, agrupada por secciones (Proteínas, Verduras, Lácteos/Grasas, Despensa/Otros). Une ítems parecidos (ej. "pollo", "pechuga de pollo") y suma cantidades de forma aproximada. Sé breve. Semana: ${JSON.stringify(weekDays)}`;
+
+  try {
+    const btnText = appLang === "en" ? "AI list ready" : "Lista IA lista";
+
+    const res = await fetch(GROK_PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: "shopping-week",
+        user: apiUser,
+        pass: apiPass,
+        lang,
+        prompt
+      })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      showToast(data.error || (lang === "en" ? "AI did not respond" : "IA no respondió"));
+      return;
+    }
+
+    const container = document.getElementById("compras");
+    const aiBoxId = "ai-shopping-box";
+    let box = document.getElementById(aiBoxId);
+    if (!box) {
+      box = document.createElement("div");
+      box.id = aiBoxId;
+      box.className = "list-row";
+      container.appendChild(box);
+    }
+    const clean = (data.text || "").replace(/\*/g, "").trim();
+    box.innerHTML = `
+      <strong>${lang === "en" ? "AI shopping list (week " : "Lista IA semana "}${selWeek}):</strong>
+      <pre class="small" style="white-space:pre-wrap">${clean}</pre>
+    `;
+    box.scrollIntoView({behavior:"smooth"});
+
+    // guardar para esa semana
+    localStorage.setItem(LS_AI_SHOPPING + selWeek, clean);
+
+    showToast(btnText);
+  } catch (err) {
+    console.error(err);
+    showToast(appLang === "en" ? "Error calling AI" : "Error llamando a la IA");
+  }
+}
+window.improveShoppingWithAI = improveShoppingWithAI;
+
 
 // ====== BODY FAT & BMR ======
 function estimateBodyFat(heightCm, weightKg, age, gender = "male") {
@@ -2166,7 +2396,18 @@ function initApp() {
     });
     aiGlobal.appendChild(btn);
   }
-
+  if (aiGlobal && !document.getElementById("aiWorkoutWeekBtn")) {
+    const btnW = document.createElement("button");
+    btnW.id = "aiWorkoutWeekBtn";
+    btnW.className = "ia-btn";
+    btnW.textContent = appLang === "en" ? "Week workouts IA 🏋️" : "Semana entrenos IA 🏋️";
+    btnW.addEventListener("click", async () => {
+      btnW.classList.add("is-loading");
+      await generateWorkoutWeekAI();
+      btnW.classList.remove("is-loading");
+    });
+    aiGlobal.appendChild(btnW);
+  }
   document.getElementById("splash-screen").classList.add("hide");
 }
 document.addEventListener("DOMContentLoaded", initApp);
