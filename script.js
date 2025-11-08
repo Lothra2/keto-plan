@@ -212,7 +212,6 @@ function buildPlan(weeks, gender = "male") {
     copy.dia = "Día " + (i + 1);
 
     // ajuste simple por género
-    // hombre = igual, mujer = -10% de kcal
     if (gender === "female") {
       copy.kcal = Math.round((copy.kcal || 1600) * 0.9);
     } else {
@@ -407,7 +406,7 @@ window.toggleMealCal = toggleMealCal;
 // ====== AGUA POR DÍA ======
 function getDailyWaterGoal() {
   const saved = Number(localStorage.getItem(LS_WATER_GOAL));
-  return saved && saved > 0 ? saved : 2400; // ml por defecto
+  return saved && saved > 0 ? saved : 2400;
 }
 function getWaterState(idx) {
   const stored = localStorage.getItem(LS_WATER_PREFIX + idx);
@@ -524,7 +523,6 @@ function getDailyMotivation(idx) {
 
 // ====== MENÚ DÍA ======
 function renderMenuDay(idx, week) {
-  // recordar selección
   localStorage.setItem(LS_SELECTED_DAY, String(idx));
   localStorage.setItem(LS_SELECTED_WEEK, String(week));
 
@@ -617,7 +615,6 @@ function renderMenuDay(idx, week) {
   `;
   menuDays.appendChild(card);
 
-  // si hay un entreno IA guardado para este día, lo mostramos
   const savedWorkout = localStorage.getItem(LS_AI_WORKOUT + idx);
   if (savedWorkout) {
     try {
@@ -689,6 +686,16 @@ function analyzeAIMeal(text) {
   return notes.join(" ");
 }
 
+// helper para parsear JSON devuelto por IA
+function safeParseJSON(str) {
+  if (!str) return null;
+  try {
+    return JSON.parse(str);
+  } catch (e) {
+    return null;
+  }
+}
+
 // ====== IA: DESAYUNO / ALMUERZO / CENA ======
 async function generateMealAI(idx, mealKey, week) {
   const like = localStorage.getItem(LS_LIKE) || "";
@@ -697,21 +704,15 @@ async function generateMealAI(idx, mealKey, week) {
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
 
-  // día base para mantener estructura
   const baseDay = derivedPlan[idx];
   const baseMeal = baseDay[mealKey] || {};
   const baseQty = baseMeal.qty || "";
   const mealPercent = mealPercents[mealKey] || 0;
   const mealKcal = mealPercent ? Math.round((baseDay.kcal || 1600) * mealPercent) : null;
-  const qtyWithKcal = mealKcal
-    ? (baseQty ? `${baseQty} • ~${mealKcal} kcal` : `~${mealKcal} kcal`)
-    : baseQty;
 
-  // lo que ya hay guardado
   let existing = JSON.parse(localStorage.getItem(LS_AI_DAY_PREFIX + idx) || "{}");
   let hasMeal = !!existing[mealKey];
 
-  // --- 1) tip local (solo si no hay nada y no choca) ---
   const tip = localSmartTips[mealKey];
   const tipLower = tip ? tip.toLowerCase() : "";
   const userDislikeLower = dislike.toLowerCase();
@@ -721,10 +722,9 @@ async function generateMealAI(idx, mealKey, week) {
       : false;
 
   if (tip && !hasMeal && !tipConflicts) {
-    // mantener estructura base, solo agregamos nota
     existing[mealKey] = {
-      nombre: (baseMeal.nombre || mealKey.toUpperCase()) + " (IA)",
-      qty: qtyWithKcal,
+      nombre: (baseMeal.nombre || mealKey.toUpperCase()) + " <span class=\"ia-tag\">IA</span>",
+      qty: baseQty + (mealKcal ? ` • ~${mealKcal} kcal` : ""),
       note: tip
     };
     localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
@@ -733,7 +733,6 @@ async function generateMealAI(idx, mealKey, week) {
     return;
   }
 
-  // --- 2) IA ---
   let mealNameES = "almuerzo";
   let mealNameEN = "lunch";
   if (mealKey === "desayuno") {
@@ -746,8 +745,8 @@ async function generateMealAI(idx, mealKey, week) {
 
   const prompt =
     lang === "en"
-      ? `Create 1 short keto ${mealNameEN} (~350-600 kcal). Prefer: ${like}. Avoid: ${dislike}. Respond ONLY with a short dish name, no explanation.`
-      : `Genera 1 ${mealNameES} keto corto (~350-600 kcal). Prefiere: ${like}. Evita: ${dislike}. Responde SOLO con el nombre del plato, sin explicación.`;
+      ? `Create 1 keto ${mealNameEN} keeping about ${mealKcal || 450} kcal. Prefer: ${like}. Avoid: ${dislike}. Respond ONLY as JSON with keys: "nombre" (short dish name), "ingredientes" (array of strings like "150 g chicken", "40 g broccoli", "1/2 avocado"), "descripcion" (very short sentence).`
+      : `Genera 1 ${mealNameES} keto manteniendo cerca de ${mealKcal || 450} kcal. Prefiere: ${like}. Evita: ${dislike}. Responde SOLO en JSON con las claves: "nombre" (nombre corto del plato), "ingredientes" (array de strings tipo "150 g pollo", "40 g brócoli", "1/2 aguacate"), "descripcion" (frase muy corta).`;
 
   try {
     const res = await fetch(GROK_PROXY, {
@@ -768,34 +767,60 @@ async function generateMealAI(idx, mealKey, week) {
       return;
     }
 
-    // limpiamos el texto de la IA
-    let text = (data.text || "").replace(/\*\*/g, "").trim();
-    // quedarnos solo con la primera línea / primera oración
-    if (text.includes("\n")) text = text.split("\n")[0].trim();
-    if (text.includes(".")) {
-      const first = text.split(".")[0].trim();
-      // si la primera frase tiene sentido, la usamos
-      if (first.length > 10) text = first;
+    let aiObj = null;
+
+    if (data.structured) {
+      aiObj = data.structured;
+    } else if (data.text) {
+      aiObj = safeParseJSON(data.text.trim());
+      if (!aiObj && data.text.includes("{") && data.text.includes("}")) {
+        const first = data.text.indexOf("{");
+        const last = data.text.lastIndexOf("}");
+        aiObj = safeParseJSON(data.text.slice(first, last + 1));
+      }
     }
 
-    if (!text) {
-      showToast(lang === "en" ? "AI returned empty text" : "La IA devolvió texto vacío");
-      return;
+    let aiName = "";
+    let aiIngredients = [];
+    let aiDesc = "";
+
+    if (aiObj) {
+      aiName = aiObj.nombre || aiObj.name || "";
+      aiIngredients = Array.isArray(aiObj.ingredientes) ? aiObj.ingredientes : (Array.isArray(aiObj.ingredients) ? aiObj.ingredients : []);
+      aiDesc = aiObj.descripcion || aiObj.description || aiObj.desc || "";
     }
 
-    // revisar lácteos u otros ingredientes
-    const note = analyzeAIMeal(text);
+    if (!aiName && data.text) {
+      let text = (data.text || "").replace(/\*\*/g, "").trim();
+      if (text.includes("\n")) text = text.split("\n")[0].trim();
+      aiName = text;
+    }
 
-    // 👇 aquí viene lo importante:
-    // - nombre: lo que diga la IA + "(IA)"
-    // - qty: la del plan base con kcal
-    // - note: solo si hace falta
+    const dairyNote = analyzeAIMeal(aiName + " " + aiIngredients.join(", ") + " " + aiDesc);
+
+    let lineIngredients = "";
+    if (aiIngredients.length) {
+      lineIngredients = aiIngredients.join(", ");
+    } else if (baseQty) {
+      lineIngredients = baseQty;
+    }
+
+    if (mealKcal) {
+      lineIngredients = lineIngredients
+        ? `${lineIngredients} • ~${mealKcal} kcal`
+        : `~${mealKcal} kcal`;
+    }
+
+    const finalName =
+      aiName
+        ? `${aiName} <span class="ia-tag">IA ${mealNameES}</span>`
+        : `${baseMeal.nombre || mealKey.toUpperCase()} <span class="ia-tag">IA ${mealNameES}</span>`;
+
     existing[mealKey] = {
-      nombre: `${text} <span class="ia-tag">IA ${mealNameES}</span>`,
-      qty: qtyWithKcal,
-      ...(note ? { note } : {})
+      nombre: finalName,
+      qty: lineIngredients,
+      ...(dairyNote ? { note: dairyNote } : aiDesc ? { note: aiDesc } : {})
     };
-
 
     localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(existing));
     renderMenuDay(idx, week);
@@ -1024,10 +1049,8 @@ async function generateWorkoutAI(idx, week) {
   const dayNumber = idx + 1;
   const weekNumber = Math.floor(idx / 7) + 1;
 
-  // 👉 leer intensidad guardada
   const intensity = localStorage.getItem(LS_WORKOUT_INTENSITY) || "medium";
 
-  // 👉 descripción según intensidad
   const intensityMap = {
     soft: lang === "en"
       ? "light 20–25 min, mobility, stretching, low impact, bodyweight only, no equipment"
@@ -1040,7 +1063,6 @@ async function generateWorkoutAI(idx, week) {
       : "intenso 45–50 min, estilo Sparta, alta intensidad, solo peso corporal, sin equipos"
   };
 
-  // 👉 ver los entrenos previos para no repetir
   const prev1 = idx > 0 ? localStorage.getItem(LS_AI_WORKOUT + (idx - 1)) : null;
   const prev2 = idx > 1 ? localStorage.getItem(LS_AI_WORKOUT + (idx - 2)) : null;
   const avoidList = [];
@@ -1107,20 +1129,16 @@ async function recalibrateWorkoutAI(idx, week) {
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
 
-  // entreno IA actual
   const currentWorkoutRaw = localStorage.getItem(LS_AI_WORKOUT + idx);
   const currentWorkout = currentWorkoutRaw ? JSON.parse(currentWorkoutRaw) : [];
 
-  // progreso del día (si hizo ejercicio o no)
   const prog = JSON.parse(localStorage.getItem(LS_PROGRESS_PREFIX + idx) || "{}");
   const didExerciseKcal = prog.exkcal ? Number(prog.exkcal) : 0;
   const dayDone = localStorage.getItem(LS_PREFIX + "done-" + idx) === "1";
 
-  // hoy es qué día y semana
   const dayNumber = idx + 1;
   const weekNumber = Math.floor(idx / 7) + 1;
 
-  // decidimos si subir o bajar
   let intent = "keep";
   if (!dayDone || didExerciseKcal === 0) intent = "lighter";
   if (didExerciseKcal > 250) intent = "harder";
@@ -1195,8 +1213,6 @@ async function generateWorkoutWeekAI() {
   const start = (selWeek - 1) * 7;
   const end = Math.min(selWeek * 7, derivedPlan.length);
   for (let i = start; i < end; i++) {
-    // generamos entreno IA para cada día
-    // eslint-disable-next-line no-await-in-loop
     await generateWorkoutAI(i, selWeek);
   }
   showToast(appLang === "en" ? "AI workouts for the week generated" : "Entrenos IA de la semana listos");
@@ -1270,7 +1286,6 @@ async function reviewWeekWithAI() {
 
     const box = document.getElementById("aiWeekSummary");
     if (box) {
-      // limpiamos los ### que trae la IA
       const clean = (data.text || "").replace(/\*/g, "").replace(/###\s*/g, "").trim();
       const parts = clean.split(/\n+/).filter(Boolean).slice(0, 4);
 
@@ -1286,7 +1301,6 @@ async function reviewWeekWithAI() {
       box.innerHTML = html;
       box.style.display = "block";
 
-      // guardar esta revisión pero asociada a ESA semana
       localStorage.setItem(LS_AI_WEEK_PREFIX + selWeek, html);
     }
 
@@ -1310,7 +1324,6 @@ async function motivateDayWithAI() {
   const water = getWaterState(selDay);
   const dayDone = localStorage.getItem(LS_PREFIX + "done-" + selDay) === "1";
 
-  // mira si hubo revisión semanal
   const selWeek = Number(localStorage.getItem(LS_SELECTED_WEEK)) || (Math.floor(selDay / 7) + 1);
   const weekReview = localStorage.getItem(LS_AI_WEEK_PREFIX + selWeek) || "";
 
@@ -1354,10 +1367,8 @@ function renderCompras() {
   const container = document.getElementById("compras");
   container.innerHTML = "";
 
-  // semana seleccionada (para ligar lista IA a la semana)
   const selWeek = Number(localStorage.getItem(LS_SELECTED_WEEK)) || 1;
 
-  // ——— Resumen rápido ———
   const done = getCompletedCount();
   const dash = document.createElement("div");
   dash.className = "list-row";
@@ -1376,7 +1387,6 @@ function renderCompras() {
   `;
   container.appendChild(dash);
 
-  // ——— Botón IA (generar) ———
   const aiRow = document.createElement("div");
   aiRow.className = "list-row";
   aiRow.innerHTML = `
@@ -1392,7 +1402,6 @@ function renderCompras() {
   `;
   container.appendChild(aiRow);
 
-  // ——— Lista base de compras (la tuya de siempre) ———
   const list = appLang === "en"
     ? [
         { cat: "Proteins", items: "Eggs, chicken, salmon, shrimp, beef, greek yogurt" },
@@ -1416,7 +1425,6 @@ function renderCompras() {
     container.appendChild(row);
   });
 
-  // ——— Mostrar lista IA guardada (si existe para esa semana) ———
   const storedShop = localStorage.getItem(LS_AI_SHOPPING + selWeek);
   if (storedShop) {
     const row = document.createElement("div");
@@ -1428,7 +1436,6 @@ function renderCompras() {
     container.appendChild(row);
   }
 
-  // ——— Extras IA detectados por día (lo que ya estabas haciendo) ———
   const aiExtras = [];
   for (let idx = 0; idx < derivedPlan.length; idx++) {
     const aiDay = localStorage.getItem(LS_AI_DAY_PREFIX + idx);
@@ -1463,12 +1470,10 @@ async function improveShoppingWithAI() {
   const apiUser = localStorage.getItem(LS_API_USER) || "";
   const apiPass = localStorage.getItem(LS_API_PASS) || "";
 
-  // semana seleccionada (ya la guardas)
   const selWeek = Number(localStorage.getItem(LS_SELECTED_WEEK)) || 1;
   const startIdx = (selWeek - 1) * 7;
   const endIdx = Math.min(selWeek * 7, derivedPlan.length);
 
-  // juntamos los 7 días (mergeando IA si hay)
   const weekDays = [];
   for (let i = startIdx; i < endIdx; i++) {
     const d = getDayWithAI(i);
@@ -1487,8 +1492,6 @@ async function improveShoppingWithAI() {
     : `Recibirás 7 días keto con ingredientes y cantidades. Condénsalos en 1 sola lista de compras en español, agrupada por secciones (Proteínas, Verduras, Lácteos/Grasas, Despensa/Otros). Une ítems parecidos (ej. "pollo", "pechuga de pollo") y suma cantidades de forma aproximada. Sé breve. Semana: ${JSON.stringify(weekDays)}`;
 
   try {
-    const btnText = appLang === "en" ? "AI list ready" : "Lista IA lista";
-
     const res = await fetch(GROK_PROXY, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1522,10 +1525,9 @@ async function improveShoppingWithAI() {
     `;
     box.scrollIntoView({behavior:"smooth"});
 
-    // guardar para esa semana
     localStorage.setItem(LS_AI_SHOPPING + selWeek, clean);
 
-    showToast(btnText);
+    showToast(lang === "en" ? "AI list ready" : "Lista IA lista");
   } catch (err) {
     console.error(err);
     showToast(appLang === "en" ? "Error calling AI" : "Error llamando a la IA");
@@ -1543,7 +1545,7 @@ function estimateBodyFat(heightCm, weightKg, age, gender = "male") {
   if (!h || !w || !a) return null;
 
   const bmi = w / (h * h);
-  const sex = gender === "female" ? 0 : 1; // 1 = hombre
+  const sex = gender === "female" ? 0 : 1;
   let bf = 1.2 * bmi + 0.23 * a - 10.8 * sex - 5.4;
 
   if (bf < 6) bf = 6;
@@ -1581,7 +1583,6 @@ function computeHydrationStats() {
   };
 }
 function getStreak() {
-  // cuenta días completados seguidos desde el inicio
   let streak = 0;
   for (let i = 0; i < derivedPlan.length; i++) {
     const done = localStorage.getItem(LS_PREFIX + "done-" + i) === "1";
@@ -1641,7 +1642,6 @@ function renderProgreso() {
   `;
   container.appendChild(baseBox);
 
-  // gamificación / logros
   const achBox = document.createElement("div");
   achBox.className = "list-row";
   const ach = getAchievements();
@@ -1651,7 +1651,6 @@ function renderProgreso() {
   `;
   container.appendChild(achBox);
 
-  // hidratación resumen
   const hydra = computeHydrationStats();
   const waterBox = document.createElement("div");
   waterBox.className = "list-row";
@@ -1951,11 +1950,9 @@ function switchTab(target) {
     document.getElementById("apiPass").value = localStorage.getItem(LS_API_PASS) || "";
     document.getElementById("waterGoalInput").value = getDailyWaterGoal();
 
-    // 👇 este es el que faltaba
     const g = localStorage.getItem(LS_GENDER) || "male";
     const gSel = document.getElementById("genderSelect");
     if (gSel) gSel.value = g;
-    // 👇 intensidad del plan
     const wInt = localStorage.getItem(LS_WORKOUT_INTENSITY) || "medium";
     const wSel = document.getElementById("workoutIntensity");
     if (wSel) wSel.value = wInt;
@@ -1982,7 +1979,6 @@ document.addEventListener("click", e => {
     const firstDayIndex = (week - 1) * 7;
     localStorage.setItem(LS_SELECTED_DAY, String(firstDayIndex));
     renderMenuDay(firstDayIndex, week);
-    // 👇 nuevo: mostrar revisión de esa semana si existe
     renderStoredWeekReview(week);
   }
 });
@@ -2027,10 +2023,8 @@ function changeGender() {
   const val = document.getElementById("genderSelect").value;
   localStorage.setItem(LS_GENDER, val);
 
-  // reconstruimos el plan con ese género
   derivedPlan = buildPlan(currentWeeks, val);
 
-  // volvemos al menú actual
   const idx = getCurrentDayIndex();
   const week = Math.floor(idx / 7) + 1;
   if (!dailyView) {
@@ -2043,7 +2037,6 @@ function changeGender() {
 }
 window.changeGender = changeGender;
 
-// intensidad del plan
 function changeWorkoutIntensity() {
   const val = document.getElementById("workoutIntensity").value;
   localStorage.setItem(LS_WORKOUT_INTENSITY, val);
@@ -2346,7 +2339,6 @@ function initApp() {
   dailyView = Number(localStorage.getItem(LS_DAILY_VIEW)) || 0;
   const savedGender = localStorage.getItem(LS_GENDER) || "male";
 
-  // ahora el plan se construye sabiendo el género
   derivedPlan = buildPlan(currentWeeks, savedGender);
   renderWeekButtons();
 
@@ -2357,7 +2349,7 @@ function initApp() {
     renderDayPills(week);
   }
   renderMenuDay(idx, week);
-  renderStoredWeekReview(week); // 👈 nuevo
+  renderStoredWeekReview(week);
   updateProgressBar();
   showMotivation();
 
@@ -2375,7 +2367,6 @@ function initApp() {
 
   askStartDateIfNeeded();
 
-  // listener para el botón semanal IA y motivación IA
   const weekBtn = document.getElementById("aiWeeklyReviewBtn");
   if (weekBtn) {
     weekBtn.addEventListener("click", () => {
