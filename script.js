@@ -1242,10 +1242,35 @@ function renderStoredWeekReview(week) {
   if (saved) {
     box.innerHTML = saved;
     box.style.display = "block";
+    // 👇 agrega esto
+    attachWeekSummaryToggle();
   } else {
     box.innerHTML = "";
     box.style.display = "none";
   }
+}
+
+// 
+function attachWeekSummaryToggle() {
+  const box = document.getElementById("aiWeekSummary");
+  if (!box) return;
+  const title = box.querySelector(".ai-week-title");
+  const body = box.querySelector(".ai-week-body");
+  if (!title || !body) return;
+
+  // para que se vea clickeable
+  title.style.cursor = "pointer";
+
+  title.onclick = () => {
+    const hidden = body.style.display === "none";
+    body.style.display = hidden ? "block" : "none";
+    // si quieres cambiar el texto del título
+    if (hidden) {
+      title.textContent = (appLang === "en" ? "AI weekly review" : "Revisión IA de la semana");
+    } else {
+      title.textContent = (appLang === "en" ? "AI weekly review (mostrar)" : "Revisión IA de la semana (mostrar)");
+    }
+  };
 }
 
 
@@ -1314,7 +1339,8 @@ async function reviewWeekWithAI() {
 
       box.innerHTML = html;
       box.style.display = "block";
-
+      // 👇 agrega esto aquí
+      attachWeekSummaryToggle();
       localStorage.setItem(LS_AI_WEEK_PREFIX + selWeek, html);
     }
 
@@ -2417,32 +2443,4 @@ function initApp() {
 }
 document.addEventListener("DOMContentLoaded", initApp);
 
-// ====== TOGGLE VISIBILIDAD DEL RESUMEN IA DE SEMANA ======
-const aiReviewBtn = document.getElementById("aiWeeklyReviewBtn");
-const aiSummary = document.getElementById("aiWeekSummary");
-let aiWeekGenerated = false; // Para saber si ya se generó
 
-aiReviewBtn.addEventListener("click", async () => {
-  // Si ya está visible, solo la ocultamos
-  if (aiSummary.style.display === "block") {
-    aiSummary.style.display = "none";
-    aiReviewBtn.textContent = "Revisar semana con IA 📊";
-    return;
-  }
-
-  // Si no está visible y ya se generó antes, solo la mostramos
-  if (aiWeekGenerated) {
-    aiSummary.style.display = "block";
-    aiReviewBtn.textContent = "Ocultar revisión IA 🙈";
-    return;
-  }
-
-  // Si nunca se ha generado, llamamos a la función y luego marcamos como generada
-  if (typeof analyzeWeekWithAI === "function") {
-    aiReviewBtn.textContent = "Analizando semana... ⏳";
-    await analyzeWeekWithAI();
-    aiWeekGenerated = true;
-    aiReviewBtn.textContent = "Ocultar revisión IA 🙈";
-    aiSummary.style.display = "block";
-  }
-});
