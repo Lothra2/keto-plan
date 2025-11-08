@@ -605,9 +605,11 @@ function renderMenuDay(idx, week) {
       <button class="done-btn ${done ? "done" : ""}" onclick="toggleDone(${idx}, ${week})">
         ${done ? (appLang === "en" ? "✔ Day completed" : "✔ Día completado") : (appLang === "en" ? "Mark day ✔" : "Marcar día ✔")}
       </button>
+      <!--
       <button class="ia-btn" onclick="generateFullDayAI(${idx}, ${week})">
         ${appLang === "en" ? "Full day AI 📅" : "Día completo IA 📅"}
       </button>
+      -->
       <button class="ia-btn ghost-btn" onclick="reviewDayWithAI(${idx}, ${week})">
         ${appLang === "en" ? "Analyze AI plan 💬" : "Analizar plan IA 💬"}
       </button>
