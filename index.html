@@ -75,19 +75,33 @@
         </div>
       </div>
 
-      <!-- Motivación general (sigue existiendo, pero el mensaje del día va en la card) -->
-      <div
-        id="motivation"
-        class="motivation-box"
-        style="display: none"
-      ></div>
+      <!-- Motivación general -->
+      <div id="motivation" class="motivation-box" style="display: none"></div>
 
       <!-- Acciones IA globales -->
-      <div class="ai-global-actions" style="display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem;">
-        <button class="ia-btn ghost" id="aiGenerateWeekBtn">
+      <div
+        class="ai-global-actions"
+        style="display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem;"
+      >
+        <!-- generar semana -->
+        <button
+          class="ia-btn ghost"
+          id="aiGenerateWeekBtn"
+          onclick="generateWeekWithAI()"
+        >
           Generar semana con IA 🤖
         </button>
-        <!-- NUEVO: revisión IA de la semana -->
+
+        <!-- generar día usando el día y semana que están en localStorage -->
+        <button
+          class="ia-btn ghost"
+          id="aiGenerateDayBtn"
+          onclick="(function(){const d = Number(localStorage.getItem('keto14-rick-sel-day')) || 0; const w = Number(localStorage.getItem('keto14-rick-sel-week')) || (Math.floor(d/7)+1); if (typeof generateFullDayAI === 'function') { generateFullDayAI(d, w); }})();"
+        >
+          Generar día con IA 📅
+        </button>
+
+        <!-- revisión IA de la semana -->
         <button class="ia-btn ghost" id="aiWeeklyReviewBtn">
           Revisar semana con IA 📊
         </button>
@@ -99,7 +113,7 @@
       <!-- Pastillas de días -->
       <div class="day-floating" id="dayFloating"></div>
 
-      <!-- AQUÍ mostraremos el resumen IA de la semana -->
+      <!-- Resumen IA de la semana -->
       <div id="aiWeekSummary" class="ai-week-review" style="display:none"></div>
 
       <!-- Aquí se renderiza el día seleccionado -->
@@ -117,9 +131,7 @@
       <!-- Nombre -->
       <div class="list-row">
         <strong>Nombre</strong>
-        <p class="small">
-          Se mostrará arriba y en algunos mensajes.
-        </p>
+        <p class="small">Se mostrará arriba y en algunos mensajes.</p>
         <input id="settingsName" placeholder="Tu nombre" />
         <button class="save-btn" onclick="applySettingsName()">
           Actualizar nombre
@@ -129,9 +141,7 @@
       <!-- Idioma -->
       <div class="list-row">
         <strong>Idioma / Language</strong>
-        <p class="small">
-          Elige el idioma para las sugerencias de IA.
-        </p>
+        <p class="small">Elige el idioma para las sugerencias de IA.</p>
         <select id="appLang" onchange="changeAppLang()">
           <option value="es">Español</option>
           <option value="en">English</option>
@@ -141,9 +151,7 @@
       <!-- Género -->
       <div class="list-row">
         <strong>Género</strong>
-        <p class="small">
-          Lo usamos para ajustar calorías y estimar % de grasa.
-        </p>
+        <p class="small">Lo usamos para ajustar calorías y estimar % de grasa.</p>
         <select id="genderSelect" onchange="changeGender()">
           <option value="male">Hombre</option>
           <option value="female">Mujer</option>
@@ -177,18 +185,14 @@
       <!-- Fecha de inicio -->
       <div class="list-row">
         <strong>Fecha de inicio</strong>
-        <p class="small">
-          La usamos para calcular el día actual del plan.
-        </p>
+        <p class="small">La usamos para calcular el día actual del plan.</p>
         <input type="date" id="startDateInput" onchange="changeStartDate()" />
       </div>
 
       <!-- Vista -->
       <div class="list-row">
         <strong>Vista</strong>
-        <p class="small">
-          Si activas vista diaria, solo se mostrará el día actual.
-        </p>
+        <p class="small">Si activas vista diaria, solo se mostrará el día actual.</p>
         <select id="dailyView" onchange="changeDailyView()">
           <option value="0">Mostrar por semana</option>
           <option value="1">Solo día actual</option>
@@ -198,9 +202,7 @@
       <!-- Color -->
       <div class="list-row">
         <strong>Color del plan</strong>
-        <p class="small">
-          Cambia el color principal de la app.
-        </p>
+        <p class="small">Cambia el color principal de la app.</p>
         <select id="primaryColor" onchange="changePrimaryColor()">
           <option value="#0f766e">Verde Keto</option>
           <option value="#9333ea">Morado</option>
@@ -213,7 +215,7 @@
       <div class="list-row">
         <strong>Agua diaria</strong>
         <p class="small">
-          Define tu meta de agua por día (en ml). Se usa en cada día del plan.
+          Define tu meta de agua por día en ml. Se usa en cada día del plan.
         </p>
         <input
           id="waterGoalInput"
@@ -232,7 +234,6 @@
         <strong>Preferencias de comidas (IA)</strong>
         <p class="small">
           La IA usará esto para desayuno IA, almuerzo IA, cena IA y día completo IA.
-          Puedes poner proteínas que prefieras y las que no.
         </p>
         <input
           id="likeFoods"
@@ -263,9 +264,7 @@
       <!-- Reset -->
       <div class="list-row">
         <strong>Reiniciar todo</strong>
-        <p class="small">
-          Esto borra tu nombre, progreso, fechas y días completados.
-        </p>
+        <p class="small">Esto borra tu nombre, progreso, fechas y días completados.</p>
         <button class="save-btn danger" onclick="resetAll()">
           Borrar todo
         </button>
@@ -275,7 +274,7 @@
       <div class="list-row">
         <strong>Agregar a pantalla de inicio</strong>
         <p class="small">
-          En iPhone o Android, abre el menú de compartir y elige
+          En iPhone o Android abre el menú de compartir y elige
           “Agregar a pantalla de inicio”.
         </p>
       </div>
