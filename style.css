@@ -85,7 +85,7 @@ body {
   background:
     radial-gradient(circle at 2% 0%, rgba(14,165,233,.18), rgba(15,23,42,0) 35%),
     radial-gradient(circle at 100% 0%, rgba(15,118,110,.22), rgba(15,23,42,0) 45%),
-    linear-gradient(180deg, var(--bg) 0%, #020617 100%);
+    linear-gradient(180deg, var(--bg) 0%, var(--bg) 100%);
   color: var(--text);
   min-height: 100vh;
   padding-bottom: 70px;
@@ -1298,4 +1298,16 @@ input[type="date"] {
   .week-btn {
     min-width: 88px;
   }
+}
+
+/* 34. AJUSTES PARA LIGHT PARA QUE NO ROMPA EN MÓVIL */
+[data-theme="light"] body::after {
+  background: radial-gradient(circle, rgba(15,118,110,.12), rgba(255,255,255,0));
+  filter: blur(50px);
+  opacity: .45;
+}
+
+[data-theme="light"] .splash {
+  background: radial-gradient(circle at top, #0f766e 0%, #e2e8f0 90%);
+  color: #0f172a;
 }
