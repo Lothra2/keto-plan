@@ -384,29 +384,6 @@ const mealPercents = {
   snackPM: 0.1,
   cena: 0.2
 };
-
-// normalizar comida IA con base
-function normalizeMealFromBase(baseDay, mealKey, aiMealObj) {
-  const baseMeal = baseDay[mealKey] || {}
-  const mealPercent = mealPercents[mealKey] || 0
-  const mealKcal = mealPercent ? Math.round((baseDay.kcal || 1600) * mealPercent) : null
-  const qtyWithKcal = baseMeal.qty
-    ? (mealKcal ? `${baseMeal.qty} • ~${mealKcal} kcal` : baseMeal.qty)
-    : (mealKcal ? `~${mealKcal} kcal` : "")
-
-  // puede venir como string o como objeto
-  const rawName =
-    aiMealObj && aiMealObj.nombre
-      ? aiMealObj.nombre
-      : (typeof aiMealObj === "string" ? aiMealObj : (baseMeal.nombre || mealKey))
-
-  return {
-    nombre: `${rawName} <span class="ia-tag">IA ${mealKey}</span>`,
-    qty: qtyWithKcal,
-    note: aiMealObj && aiMealObj.note ? aiMealObj.note : ""
-  }
-}
-
 function calcConsumedFromState(state, day) {
   const goal = state.goal || day.kcal || 1600;
   let consumed = 0;
@@ -875,15 +852,15 @@ async function generateFullDayAI(idx, week) {
         dia: baseDay.dia,
         kcal: structured.kcal || baseDay.kcal,
         macros: structured.macros || baseDay.macros,
-        desayuno: normalizeMealFromBase(baseDay, "desayuno", structured.desayuno),
-        snackAM: normalizeMealFromBase(baseDay, "snackAM", structured.snackAM),
-        almuerzo: normalizeMealFromBase(baseDay, "almuerzo", structured.almuerzo),
-        snackPM: normalizeMealFromBase(baseDay, "snackPM", structured.snackPM),
-        cena: normalizeMealFromBase(baseDay, "cena", structured.cena)
-      }
-      localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(normalized))
-      renderMenuDay(idx, week)
-      showToast(lang === "en" ? "Full AI day applied" : "Día IA aplicado")
+        desayuno: structured.desayuno || baseDay.desayuno,
+        snackAM: structured.snackAM || baseDay.snackAM,
+        almuerzo: structured.almuerzo || baseDay.almuerzo,
+        snackPM: structured.snackPM || baseDay.snackPM,
+        cena: structured.cena || baseDay.cena
+      };
+      localStorage.setItem(LS_AI_DAY_PREFIX + idx, JSON.stringify(normalized));
+      renderMenuDay(idx, week);
+      showToast(lang === "en" ? "Full AI day applied" : "Día IA aplicado");
     } else {
       showToast(lang === "en" ? "AI answered but was not structured" : "La IA respondió pero no en formato estructurado");
     }
@@ -976,25 +953,18 @@ function extractJSONSnippet(raw) {
   return null;
 }
 
-// normalizar array de ejercicios
 function normalizeWorkoutArray(arr, lang) {
-  if (!Array.isArray(arr)) return []
-  const intensity = localStorage.getItem(LS_WORKOUT_INTENSITY) || "medium"
-  const restByInt = {
-    soft: lang === "en" ? "Rest 30-40 s" : "Descansa 30-40 s",
-    medium: lang === "en" ? "Rest 45-60 s" : "Descansa 45-60 s",
-    hard: lang === "en" ? "Rest 60-75 s" : "Descansa 60-75 s"
-  }
+  if (!Array.isArray(arr)) return [];
   return arr
     .map(it => {
       return {
         nombre: it.nombre || it.name || "",
         series: it.series || it.reps || (lang === "en" ? "3 sets" : "3 series"),
-        descripcion: it.descripcion || it.desc || restByInt[intensity]
-      }
+        descripcion: it.descripcion || it.desc || ""
+      };
     })
     .filter(it => it.nombre)
-    .slice(0, 6)
+    .slice(0, 6);
 }
 
 function parseWorkoutTextToClean(raw, lang) {
@@ -1024,16 +994,14 @@ function renderWorkoutCardsFromArray(idx, workouts, lang) {
     `<div class="ai-workout-grid">` +
     workouts
       .map(w => {
-        const series = w.series || "";
-        const rest = w.rest || "";
-        const desc = w.descripcion || "";
-        const seriesLine = rest ? `${series} · ${rest}` : series;
-
+        const n = w.nombre || "";
+        const s = w.series || "";
+        const d = w.descripcion || "";
         return `
           <div class="ai-workout-item">
-            <div class="ai-w-name">${w.nombre}</div>
-            <div class="ai-w-series">${seriesLine}</div>
-            ${desc ? `<div class="ai-w-desc">${desc}</div>` : ""}
+            <div class="ai-w-name">${n}</div>
+            <div class="ai-w-series">${s}</div>
+            <div class="ai-w-desc">${d}</div>
           </div>
         `;
       })
@@ -1041,7 +1009,6 @@ function renderWorkoutCardsFromArray(idx, workouts, lang) {
     `</div>`;
   box.style.display = "block";
 }
-
 
 async function generateWorkoutAI(idx, week) {
   const apiUser = localStorage.getItem(LS_API_USER) || "";
