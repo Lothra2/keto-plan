@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f766e" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f1f5f9" media="(prefers-color-scheme: light)" />
+
+    <!-- SEO -->
+    <title>Keto Pro Ultra - Tu plan cetogénico personalizado</title>
+    <meta name="description" content="Aplicación web profesional para gestionar tu dieta cetogénica con inteligencia artificial. Plan personalizado, seguimiento de progreso y más." />
+    <meta name="keywords" content="keto, dieta cetogénica, nutrición, salud, fitness, PWA" />
+    <meta name="author" content="Keto Pro Team" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://keto-pro-ultra.netlify.app/" />
+    <meta property="og:title" content="Keto Pro Ultra - Tu plan cetogénico personalizado" />
+    <meta property="og:description" content="Gestiona tu dieta keto con IA. Plan personalizado y seguimiento completo." />
+    <meta property="og:image" content="/icons/icon-512x512.png" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://keto-pro-ultra.netlify.app/" />
+    <meta property="twitter:title" content="Keto Pro Ultra" />
+    <meta property="twitter:description" content="Tu plan cetogénico personalizado con IA" />
+    <meta property="twitter:image" content="/icons/icon-512x512.png" />
+
+    <!-- Apple Specific -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Keto Pro" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icon.png" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Fonts (preload for performance) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="/styles/main.css" />
+
+    <!-- Preload critical scripts -->
+    <link rel="modulepreload" href="/main.js" />
+  </head>
+
+  <body data-theme="dark">
+    <!-- App Root -->
+    <div id="app">
+      <!-- Splash Screen -->
+      <div id="splash" class="splash-screen">
+        <div class="splash-content">
+          <div class="splash-logo">
+            <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="40" cy="40" r="35" fill="url(#gradient)" />
+              <path d="M40 15C26.75 15 16 25.75 16 39s10.75 24 24 24 24-10.75 24-24S53.25 15 40 15zm0 4c11.05 0 20 8.95 20 20s-8.95 20-20 20-20-8.95-20-20 8.95-20 20-20z" fill="white" />
+              <defs>
+                <linearGradient id="gradient" x1="5" y1="5" x2="75" y2="75" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#0f766e" />
+                  <stop offset="1" stop-color="#14b8a6" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <h1 class="splash-title">Keto Pro Ultra</h1>
+          <p class="splash-subtitle">Tu plan cetogénico personalizado</p>
+          <div class="splash-loader">
+            <div class="loader-bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Content (cargado dinámicamente) -->
+      <div id="main-content" class="hidden">
+        <!-- Header -->
+        <header id="app-header" class="app-header"></header>
+
+        <!-- Navigation Tabs -->
+        <nav id="app-tabs" class="app-tabs"></nav>
+
+        <!-- Page Container -->
+        <main id="page-container" class="page-container"></main>
+
+        <!-- Bottom Navigation (Mobile) -->
+        <nav id="bottom-nav" class="bottom-nav"></nav>
+      </div>
+    </div>
+
+    <!-- Modals Container -->
+    <div id="modals"></div>
+
+    <!-- Toast Container -->
+    <div id="toasts" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
