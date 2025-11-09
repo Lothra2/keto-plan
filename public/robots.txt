@@ -1,0 +1,6 @@
+# robots.txt for Keto Pro Ultra
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://keto-pro-ultra.netlify.app/sitemap.xml
