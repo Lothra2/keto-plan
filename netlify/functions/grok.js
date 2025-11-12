@@ -1,11 +1,19 @@
 // netlify/functions/grok.js
 
+// ===== Utils de máscara para logs seguros =====
+function mask(v = "") {
+  if (!v) return "<empty>";
+  if (typeof v !== "string") v = String(v);
+  if (v.length <= 2) return "*".repeat(v.length);
+  return v[0] + "*".repeat(Math.max(1, v.length - 2)) + v[v.length - 1];
+}
+
 // ==== Helpers de AUTH flexible ====
 function decodeBasicAuth(headerAuth = "") {
   if (!headerAuth || typeof headerAuth !== "string") return {};
-  const val = headerAuth.startsWith("Basic ") ? headerAuth.slice(6) : headerAuth;
+  const raw = headerAuth.startsWith("Basic ") ? headerAuth.slice(6) : headerAuth;
   try {
-    const decoded = Buffer.from(val, "base64").toString("utf8");
+    const decoded = Buffer.from(raw, "base64").toString("utf8");
     const idx = decoded.indexOf(":");
     if (idx === -1) return {};
     return { user: decoded.slice(0, idx), pass: decoded.slice(idx + 1) };
@@ -23,15 +31,20 @@ function getExpectedCreds() {
 
 function getProvidedCreds(event, body) {
   const headers = event.headers || {};
-  // Netlify entrega headers en minúsculas
   const authHeader = headers.authorization || headers.Authorization || "";
   const fromHeader = decodeBasicAuth(authHeader);
   const fromBody = { user: body.user || "", pass: body.pass || "" };
 
-  return {
+  const provided = {
     user: fromBody.user || fromHeader.user || "",
     pass: fromBody.pass || fromHeader.pass || ""
   };
+
+  const sources = [];
+  if (fromBody.user || fromBody.pass) sources.push("body");
+  if (fromHeader.user || fromHeader.pass) sources.push("header-basic");
+
+  return { provided, sources, rawHeaderPresent: !!authHeader };
 }
 
 exports.handler = async (event) => {
@@ -67,17 +80,40 @@ exports.handler = async (event) => {
 
   // ==== AUTH unificada (acepta APP_* o AI_* y Basic o body) ====
   const { expectedUser, expectedPass } = getExpectedCreds();
+
   if (!OPENAI_API_KEY) {
     return {
       statusCode: 500,
       body: JSON.stringify({ ok: false, error: "OPENAI_API_KEY not configured" })
     };
   }
+
   if (expectedUser && expectedPass) {
-    const { user: providedUser, pass: providedPass } = getProvidedCreds(event, body);
-    if (providedUser !== expectedUser || providedPass !== expectedPass) {
-      return { statusCode: 401, body: JSON.stringify({ ok: false, error: "Unauthorized" }) };
+    const { provided, sources, rawHeaderPresent } = getProvidedCreds(event, body);
+    const okAuth = provided.user === expectedUser && provided.pass === expectedPass;
+
+    if (!okAuth) {
+      // Logs seguros para debug en Netlify
+      console.log("AUTH DEBUG => expectedUser:", mask(expectedUser), " expectedPass:", mask(expectedPass));
+      console.log("AUTH DEBUG => providedUser:", mask(provided.user), " providedPass:", mask(provided.pass));
+      console.log("AUTH DEBUG => sources:", sources, " rawHeaderPresent:", rawHeaderPresent);
+      console.log("AUTH DEBUG => headers keys:", Object.keys(event.headers || {}));
+
+      return {
+        statusCode: 401,
+        body: JSON.stringify({
+          ok: false,
+          error: "Unauthorized",
+          reason: "mismatch",
+          expectedSet: Boolean(expectedUser && expectedPass),
+          providedSources: sources,
+          hadAuthHeader: rawHeaderPresent
+        })
+      };
     }
+  } else {
+    // Si no hay vars esperadas, no exigimos auth
+    console.log("AUTH INFO => No expected creds set (APP_/AI_). Skipping auth.");
   }
 
   // ====== 1) CHAT del Consultor ======
@@ -266,10 +302,7 @@ No expliques nada.`
         structured = JSON.parse(text);
       } catch {}
 
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ ok: true, text, structured })
-      };
+      return { statusCode: 200, body: JSON.stringify({ ok: true, text, structured }) };
     } catch (e) {
       return {
         statusCode: 500,
