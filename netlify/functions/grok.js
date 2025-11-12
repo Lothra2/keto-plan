@@ -22,7 +22,18 @@ exports.handler = async (event) => {
     };
   }
 
-  const { prompt, mode = "dinner", lang = "es", user = "", pass = "", prefs = {}, kcal = 1600, dayIndex = 1, username = "" } = body;
+  const {
+    prompt,
+    mode = "dinner",
+    lang = "es",
+    user = "",
+    pass = "",
+    prefs = {},
+    kcal = 1600,
+    dayIndex = 1,
+    username = "",
+    size = "1024x1024"
+  } = body;
 
   // auth simple
   if (APP_USER && APP_PASS) {
@@ -41,11 +52,118 @@ exports.handler = async (event) => {
     };
   }
 
-  // construimos el mensaje según modo
-  let messages = [];
+  // ====== 1) NUEVO: MODOS DE CHAT LIBRE DEL CONSULTOR ======
+  // Acepta varios alias para que tu app no rompa si cambia el "mode"
+  if (["consultor-chat", "chat", "general", "free-chat"].includes(mode)) {
+    if (!prompt) {
+      return { statusCode: 400, body: JSON.stringify({ ok: false, error: "prompt required" }) };
+    }
+
+    const systemEs = "Eres un experto en dieta keto balanceada y entrenador de calistenia con 20 años de experiencia. Responde de forma clara, directa y accionable. Si hay riesgos, adviértelos. Puedes proponer recetas, planes y entrenos de peso corporal.";
+    const systemEn = "You are a balanced keto nutrition expert and a calisthenics coach with 20 years of experience. Answer clearly, directly, and with actionable steps. Warn about risks if needed. You can propose recipes, plans, and bodyweight workouts.";
+
+    const system = lang === "en" ? systemEn : systemEs;
+
+    const messages = [
+      { role: "system", content: system },
+      { role: "user", content: prompt }
+    ];
+
+    try {
+      const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages,
+          temperature: 0.5,
+          max_tokens: 800
+        })
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) {
+        return {
+          statusCode: resp.status,
+          body: JSON.stringify({ ok: false, error: data.error?.message || "OpenAI error" })
+        };
+      }
+
+      const text = data.choices?.[0]?.message?.content || "";
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ ok: true, text })
+      };
+    } catch (e) {
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ ok: false, error: e.message || "request failed" })
+      };
+    }
+  }
+
+  // ====== 2) NUEVO: MODOS DE IMAGEN ======
+  if (["image", "image-gen", "generate-image"].includes(mode)) {
+    if (!prompt) {
+      return { statusCode: 400, body: JSON.stringify({ ok: false, error: "prompt required" }) };
+    }
+
+    const guardrail = lang === "en"
+      ? "Clean fitness or keto look, no text overlays, natural lighting, high quality."
+      : "Estética limpia de fitness o keto, sin textos, luz natural, alta calidad.";
+
+    try {
+      const resp = await fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "gpt-image-1",
+          prompt: `${guardrail}\n\n${prompt}`,
+          size,                 // "1024x1024" por defecto
+          n: 1,
+          response_format: "url" // puedes cambiar a "b64_json" si prefieres base64
+        })
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) {
+        return {
+          statusCode: resp.status,
+          body: JSON.stringify({ ok: false, error: data.error?.message || "OpenAI image error" })
+        };
+      }
+
+      const imageUrl = data?.data?.[0]?.url || null;
+      const b64 = data?.data?.[0]?.b64_json || null;
+
+      if (!imageUrl && !b64) {
+        return { statusCode: 502, body: JSON.stringify({ ok: false, error: "Image generation failed" }) };
+      }
+
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ ok: true, imageUrl, base64: b64 })
+      };
+    } catch (e) {
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ ok: false, error: e.message || "request failed" })
+      };
+    }
+  }
+
+  // ====== 3) MODO EXISTENTE: full-day, lo dejamos igual ======
   if (mode === "full-day") {
     const like = prefs.like || "";
     const dislike = prefs.dislike || "";
+    let messages = [];
+
     if (lang === "en") {
       messages = [
         {
@@ -93,25 +211,66 @@ No expliques nada.`
         }
       ];
     }
-  } else {
-    // modo cena (compat)
-    if (!prompt) {
+
+    try {
+      const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages,
+          temperature: 0.45,
+          max_tokens: 650
+        })
+      });
+
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        return {
+          statusCode: resp.status,
+          body: JSON.stringify({ ok: false, error: data.error?.message || "OpenAI error" })
+        };
+      }
+
+      const text = data.choices?.[0]?.message?.content || "";
+      let structured = null;
+      try {
+        structured = JSON.parse(text);
+      } catch (e) {}
+
       return {
-        statusCode: 400,
-        body: JSON.stringify({ ok: false, error: "prompt required" })
+        statusCode: 200,
+        body: JSON.stringify({
+          ok: true,
+          text,
+          structured
+        })
+      };
+
+    } catch (e) {
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ ok: false, error: e.message || "request failed" })
       };
     }
-    messages = [
-      {
-        role: "system",
-        content: "You are a helpful keto assistant."
-      },
-      {
-        role: "user",
-        content: prompt
-      }
-    ];
   }
+
+  // ====== 4) COMPAT: cualquier otro modo cae a prompt directo tipo "dinner" ======
+  if (!prompt) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ ok: false, error: "prompt required" })
+    };
+  }
+
+  const messages = [
+    { role: "system", content: "You are a helpful keto assistant." },
+    { role: "user", content: prompt }
+  ];
 
   try {
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -138,22 +297,9 @@ No expliques nada.`
     }
 
     const text = data.choices?.[0]?.message?.content || "";
-    let structured = null;
-    if (mode === "full-day") {
-      try {
-        structured = JSON.parse(text);
-      } catch (e) {
-        // si no se pudo, igual devolvemos text
-      }
-    }
-
     return {
       statusCode: 200,
-      body: JSON.stringify({
-        ok: true,
-        text,
-        structured
-      })
+      body: JSON.stringify({ ok: true, text })
     };
 
   } catch (e) {
