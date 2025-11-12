@@ -1,5 +1,39 @@
 // netlify/functions/grok.js
 
+// ==== Helpers de AUTH flexible ====
+function decodeBasicAuth(headerAuth = "") {
+  if (!headerAuth || typeof headerAuth !== "string") return {};
+  const val = headerAuth.startsWith("Basic ") ? headerAuth.slice(6) : headerAuth;
+  try {
+    const decoded = Buffer.from(val, "base64").toString("utf8");
+    const idx = decoded.indexOf(":");
+    if (idx === -1) return {};
+    return { user: decoded.slice(0, idx), pass: decoded.slice(idx + 1) };
+  } catch {
+    return {};
+  }
+}
+
+function getExpectedCreds() {
+  // Acepta cualquiera de las dos parejas de env vars
+  const expectedUser = process.env.APP_USER || process.env.AI_USER || "";
+  const expectedPass = process.env.APP_PASS || process.env.AI_PASS || "";
+  return { expectedUser, expectedPass };
+}
+
+function getProvidedCreds(event, body) {
+  const headers = event.headers || {};
+  // Netlify entrega headers en minúsculas
+  const authHeader = headers.authorization || headers.Authorization || "";
+  const fromHeader = decodeBasicAuth(authHeader);
+  const fromBody = { user: body.user || "", pass: body.pass || "" };
+
+  return {
+    user: fromBody.user || fromHeader.user || "",
+    pass: fromBody.pass || fromHeader.pass || ""
+  };
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
     return {
@@ -9,8 +43,6 @@ exports.handler = async (event) => {
   }
 
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-  const APP_USER = process.env.APP_USER || ""; // opcional
-  const APP_PASS = process.env.APP_PASS || ""; // opcional
 
   let body = {};
   try {
@@ -26,8 +58,6 @@ exports.handler = async (event) => {
     prompt,
     mode = "dinner",
     lang = "es",
-    user = "",
-    pass = "",
     prefs = {},
     kcal = 1600,
     dayIndex = 1,
@@ -35,32 +65,31 @@ exports.handler = async (event) => {
     size = "1024x1024"
   } = body;
 
-  // auth simple
-  if (APP_USER && APP_PASS) {
-    if (user !== APP_USER || pass !== APP_PASS) {
-      return {
-        statusCode: 401,
-        body: JSON.stringify({ ok: false, error: "Unauthorized" })
-      };
-    }
-  }
-
+  // ==== AUTH unificada (acepta APP_* o AI_* y Basic o body) ====
+  const { expectedUser, expectedPass } = getExpectedCreds();
   if (!OPENAI_API_KEY) {
     return {
       statusCode: 500,
       body: JSON.stringify({ ok: false, error: "OPENAI_API_KEY not configured" })
     };
   }
+  if (expectedUser && expectedPass) {
+    const { user: providedUser, pass: providedPass } = getProvidedCreds(event, body);
+    if (providedUser !== expectedUser || providedPass !== expectedPass) {
+      return { statusCode: 401, body: JSON.stringify({ ok: false, error: "Unauthorized" }) };
+    }
+  }
 
-  // ====== 1) NUEVO: MODOS DE CHAT LIBRE DEL CONSULTOR ======
-  // Acepta varios alias para que tu app no rompa si cambia el "mode"
+  // ====== 1) CHAT del Consultor ======
   if (["consultor-chat", "chat", "general", "free-chat"].includes(mode)) {
     if (!prompt) {
       return { statusCode: 400, body: JSON.stringify({ ok: false, error: "prompt required" }) };
     }
 
-    const systemEs = "Eres un experto en dieta keto balanceada y entrenador de calistenia con 20 años de experiencia. Responde de forma clara, directa y accionable. Si hay riesgos, adviértelos. Puedes proponer recetas, planes y entrenos de peso corporal.";
-    const systemEn = "You are a balanced keto nutrition expert and a calisthenics coach with 20 years of experience. Answer clearly, directly, and with actionable steps. Warn about risks if needed. You can propose recipes, plans, and bodyweight workouts.";
+    const systemEs =
+      "Eres un experto en dieta keto balanceada y entrenador de calistenia con 20 años de experiencia. Responde de forma clara, directa y accionable. Si hay riesgos, adviértelos. Puedes proponer recetas, planes y entrenos de peso corporal.";
+    const systemEn =
+      "You are a balanced keto nutrition expert and a calisthenics coach with 20 years of experience. Answer clearly, directly, and with actionable steps. Warn about risks if needed. You can propose recipes, plans, and bodyweight workouts.";
 
     const system = lang === "en" ? systemEn : systemEs;
 
@@ -93,10 +122,7 @@ exports.handler = async (event) => {
       }
 
       const text = data.choices?.[0]?.message?.content || "";
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ ok: true, text })
-      };
+      return { statusCode: 200, body: JSON.stringify({ ok: true, text }) };
     } catch (e) {
       return {
         statusCode: 500,
@@ -105,15 +131,16 @@ exports.handler = async (event) => {
     }
   }
 
-  // ====== 2) NUEVO: MODOS DE IMAGEN ======
+  // ====== 2) Generación de IMAGEN ======
   if (["image", "image-gen", "generate-image"].includes(mode)) {
     if (!prompt) {
       return { statusCode: 400, body: JSON.stringify({ ok: false, error: "prompt required" }) };
     }
 
-    const guardrail = lang === "en"
-      ? "Clean fitness or keto look, no text overlays, natural lighting, high quality."
-      : "Estética limpia de fitness o keto, sin textos, luz natural, alta calidad.";
+    const guardrail =
+      lang === "en"
+        ? "Clean fitness or keto look, no text overlays, natural lighting, high quality."
+        : "Estética limpia de fitness o keto, sin textos, luz natural, alta calidad.";
 
     try {
       const resp = await fetch("https://api.openai.com/v1/images/generations", {
@@ -125,9 +152,9 @@ exports.handler = async (event) => {
         body: JSON.stringify({
           model: "gpt-image-1",
           prompt: `${guardrail}\n\n${prompt}`,
-          size,                 // "1024x1024" por defecto
+          size,
           n: 1,
-          response_format: "url" // puedes cambiar a "b64_json" si prefieres base64
+          response_format: "url"
         })
       });
 
@@ -146,10 +173,7 @@ exports.handler = async (event) => {
         return { statusCode: 502, body: JSON.stringify({ ok: false, error: "Image generation failed" }) };
       }
 
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ ok: true, imageUrl, base64: b64 })
-      };
+      return { statusCode: 200, body: JSON.stringify({ ok: true, imageUrl, base64: b64 }) };
     } catch (e) {
       return {
         statusCode: 500,
@@ -158,7 +182,7 @@ exports.handler = async (event) => {
     }
   }
 
-  // ====== 3) MODO EXISTENTE: full-day, lo dejamos igual ======
+  // ====== 3) FULL-DAY existente ======
   if (mode === "full-day") {
     const like = prefs.like || "";
     const dislike = prefs.dislike || "";
@@ -240,17 +264,12 @@ No expliques nada.`
       let structured = null;
       try {
         structured = JSON.parse(text);
-      } catch (e) {}
+      } catch {}
 
       return {
         statusCode: 200,
-        body: JSON.stringify({
-          ok: true,
-          text,
-          structured
-        })
+        body: JSON.stringify({ ok: true, text, structured })
       };
-
     } catch (e) {
       return {
         statusCode: 500,
@@ -259,12 +278,9 @@ No expliques nada.`
     }
   }
 
-  // ====== 4) COMPAT: cualquier otro modo cae a prompt directo tipo "dinner" ======
+  // ====== 4) COMPAT: fallback tipo "dinner" ======
   if (!prompt) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ ok: false, error: "prompt required" })
-    };
+    return { statusCode: 400, body: JSON.stringify({ ok: false, error: "prompt required" }) };
   }
 
   const messages = [
@@ -297,11 +313,7 @@ No expliques nada.`
     }
 
     const text = data.choices?.[0]?.message?.content || "";
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ ok: true, text })
-    };
-
+    return { statusCode: 200, body: JSON.stringify({ ok: true, text }) };
   } catch (e) {
     return {
       statusCode: 500,
